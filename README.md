@@ -24,6 +24,7 @@ check.pkgs.sh
 mamba create -n NanoPhase python=3.8 -y
 mamba activate NanoPhase
 mamba install -c nanophase nanophase -y
+sed -i.bak '0,/\$BASM.alignSorted/s//-o \$BASM.alignSorted.bam/' `which polca.sh` ## make polca-polishing compatible with higher versions of samtools
 ```
 Then you may check if all necessary packages existed using `check.pkgs.sh`.
 If all pakcages have been installed sucessfully in the NanoPhase env, type `NanoPhase -h` for more usage information

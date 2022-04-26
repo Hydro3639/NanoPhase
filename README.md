@@ -22,6 +22,7 @@ check.pkgs.sh
 2). Install NanoPhase via conda
 ```
 mamba create -n NanoPhase python=3.8 -y
+mamba activate NanoPhase
 mamba install -c nanophase nanophase -y
 ```
 Then you may check if all necessary packages existed using `check.pkgs.sh`.

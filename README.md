@@ -6,7 +6,7 @@ NanoPhase is an easy-to-use pipeline to generate reference-quality MAGs using on
 
 ### Installation instructions
 1). One of the most convenient and fast ways to install NanoPhase is create a NanoPhase env and using [mamba](https://github.com/mamba-org/mamba) to install/manage [all NanoPhase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/Dependecy.md). It should be finished in ~5 mins (depends on your local internet).
-If mamba has not been in the base environment, please use `conda install mamba -n base -c conda-forge` to install and activate.
+If mamba has not been in the base environment, please use `conda install mamba -n base -c conda-forge` to install and follow the instruction to activate mamba.
 ```
 git clone https://github.com/Hydro3639/NanoPhase.git
 source NanoPhase/bin/Install.sh

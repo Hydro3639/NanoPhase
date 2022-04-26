@@ -7,7 +7,7 @@
 NanoPhase is an easy-to-use pipeline to generate reference-quality MAGs using only Nanopore long reads or both Nanopore long and Illumina short reads (hybrid strategy) from complex metagenomes.
 
 ### Installation instructions
-1). One of the most convenient and fast ways to install NanoPhase is create a NanoPhase env and using [mamba](https://github.com/mamba-org/mamba) to install/manage [all NanoPhase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/Dependecy.md). It should be finished in ~5 mins (depends on your local internet).
+1). One of the most convenient and fast ways to install NanoPhase is create a NanoPhase env and using [mamba](https://github.com/mamba-org/mamba) to install/manage [all NanoPhase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md). It should be finished in ~5 mins (depends on your local internet).
 If mamba is not in the base environment, please use `conda install mamba -n base -c conda-forge` to install and follow the instruction to activate mamba.
 ```
 git clone https://github.com/Hydro3639/NanoPhase.git

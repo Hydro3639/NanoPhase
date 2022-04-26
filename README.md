@@ -20,7 +20,13 @@ check.pkgs.sh
 ```
 
 ```
-Then you may check if all necessary packages existed using `check.pkgs.sh`
+In addition, you need to download [checkm_DB](https://data.ace.uq.edu.au/public/CheckM_databases/) and inform CheckM of where the database has been placed by the following commands, detailed could be seen at [checkm wiki](https://github.com/Ecogenomics/CheckM/wiki/Installation#:~:text=acknowledge%20you%20here!\)-,Required%20reference%20data,-CheckM%20relies%20on). <br>
+```
+wget https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz
+mkdir checkm_DB && tar -zxvf checkm_data_2015_01_16.tar.gz -C checkm_DB && rm -rf checkm_data_2015_01_16.tar.gz
+checkm data setRoot path_to/checkm_DB
+```
+Then you may check if all necessary packages existed using `check.pkgs.sh`.
 If all pakcages have been installed sucessfully in the NanoPhase env, type `NanoPhase -h` for more usage information
 ```
 NanoPhase -h

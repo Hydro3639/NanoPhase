@@ -48,6 +48,8 @@ check_pkg="false"
 medaka_model="r941_min_hac_g507"
 VERSION="0.1.0"
 
+## call command to tmp_cmd
+tmp_cmd=`echo -e "\nCommand line: $CRTDIR/NanoPhase $*"`
 ##
 params="$(getopt -o hl:1:2:t:o:m:v --long help,hybrid,long:,long-read-only,threads:,medaka_model:,out:,check,version -- "$@")"
 if [[ $? -gt 0 ]]; then show_help; exit 1; fi
@@ -98,7 +100,7 @@ fi
 
 printf "\n"
 ## call command line 
-echo -e "\nCommand line: $CRTDIR/NanoPhase $*\n" >&2
+echo $tmp_cmd
 echo "===========================================================================================================
 NanoPhase starts @`date "+%Y/%m/%d -- %H:%M:%S"`"
 printf "\n"

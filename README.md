@@ -18,7 +18,7 @@ You may check if all necessary packages has been installed sucessfully in the Na
 ```
 mamba activate NanoPhase
 ## or conda activate NanoPhase
-check.pkgs.sh
+NanoPhase --check
 ## if still some packages were not in the NanoPhase enviroment, please install, like using "mamba install -c bioconda package_name", then check it again
 ```
 2). Install NanoPhase via conda
@@ -27,7 +27,7 @@ mamba create -n NanoPhase python=3.8 -y
 mamba activate NanoPhase
 mamba install -c nanophase nanophase -y
 ```
-Then you may check if all necessary packages existed using `check.pkgs.sh`.
+Then you may check if all necessary packages existed using `NanoPhase --check`.
 If all pakcages have been installed sucessfully in the NanoPhase env, type `NanoPhase -h` for more usage information
 ```
 NanoPhase -h
@@ -35,6 +35,7 @@ NanoPhase -h
 NanoPhase v=0.1.0
 
 arguments:
+        --check                 check the package availability
         --long_read_only        only Nanopore long reads were involved [default: on]
         --hybrid                both short and long reads were required [Optional]
         -l, --long              Nanopore reads: fasta/q file that basecalled by Guppy 5+ or using 20+ chemistry was recommended if only Nanopore reads were included [Mandatory]

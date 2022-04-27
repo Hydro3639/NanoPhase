@@ -69,6 +69,7 @@ while true; do
 		-v | --version) echo "NanoPhase v=$VERSION"; exit 0; shift; break;;
 		--hybrid) Type=hybrid; shift 1;;
 		--long-read-only) Type=long_read_only; shift 1;;
+		--check) check_pkg=true; shift 1;;
 		-h | --help) show_help; exit 0; shift 1;;
 		--) show_help; exit 0; shift; break ;;
 		*) break;;

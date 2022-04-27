@@ -53,6 +53,7 @@ output sub-folders:
         03-Polishing            Sub-folder containing polished bins
 
 example usage:
+        NanoPhase --check
         Nanophase -l ont.fastq -t 16 -o NanoPhase-out ## long reads only
         Nanophase -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out ## hybrid strategy
 ```

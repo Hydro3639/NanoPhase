@@ -961,8 +961,8 @@ elif [[ $check_pkg == true ]]; then
                 path_check=`cat .package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | awk '!a[$1]++' | wc -l`
                 if [[ $path_check -gt 1 ]]; then
                         echo "Warning: [`cat .package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | grep -v 'NanoPhase\/bin' | while read line; do grep -w $line .package.installed; done | awk '!a[$1]++ {print $1}' | tr '\n' ' ' | sed -e 's/ $//g'`] has not been installed in the [NanoPhase] env. Strongly recommend intalling all packages in the NanoPhase env, or it may result in a failure"
-                        rm -rf .package.installed
                 fi
+		rm -rf .package.installed
         else
                 echo "Error: [`cat .package.not.installed | sed -e 's/ //g' | tr '\n' ' ' | sed -e 's/ $//g'`] cannot be found in the environment, please install. Now terminating..."
                 rm -rf .package.not.installed && rm -rf .package.installed

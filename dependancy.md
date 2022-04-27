@@ -5,7 +5,7 @@
   * [bgzip](https://github.com/samtools/tabix)
   * [bwa](https://github.com/lh3/bwa)
   * [checkm](https://github.com/Ecogenomics/CheckM)                                                                                 
-  * [flye](https://github.com/fenderglass/Flye)
+  * [flye/metaflye](https://github.com/fenderglass/Flye)
   * [freebayes](https://github.com/freebayes/freebayes)
   * [HMMER](http://hmmer.org/)
   * [medaka](https://github.com/nanoporetech/medaka)

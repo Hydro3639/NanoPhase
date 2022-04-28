@@ -3,6 +3,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/nanophase/nanophase/badges/version.svg)](https://anaconda.org/nanophase/nanophase)
 [![Anaconda-Server Badge](https://anaconda.org/nanophase/nanophase/badges/downloads.svg)](https://anaconda.org/nanophase/nanophase)
 [![Anaconda-Server Badge](https://anaconda.org/nanophase/nanophase/badges/installer/conda.svg)](https://conda.anaconda.org/nanophase)
+[![Page Views Count](https://badges.toozhao.com/badges/01G1R6T9AWQHA36B74VYS20QYT/green.svg)](https://badges.toozhao.com/stats/01G1R6T9AWQHA36B74VYS20QYT "Get your own page views count badge on badges.toozhao.com")
 
 NanoPhase is an easy-to-use pipeline to generate reference-quality MAGs using only Nanopore long reads or both Nanopore long and Illumina short reads (hybrid strategy) from complex metagenomes. If NanoPhase is interrupted, it will resume from the last completed stage.
 

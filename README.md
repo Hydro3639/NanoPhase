@@ -14,7 +14,7 @@ git clone https://github.com/Hydro3639/NanoPhase.git
 source NanoPhase/bin/Install.sh
 ## this command will create NanoPhase env and install all necessary packages
 ```
-You may check if all necessary packages has been installed sucessfully in the NanoPhase env using the following command
+You may check if all necessary packages have been installed sucessfully in the NanoPhase env using the following command
 ```
 mamba activate NanoPhase
 ## or conda activate NanoPhase

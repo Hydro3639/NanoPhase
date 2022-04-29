@@ -20,7 +20,7 @@ You may check if all necessary packages have been installed sucessfully in the N
 mamba activate NanoPhase
 ## or conda activate NanoPhase
 NanoPhase --check
-## if still some packages were not in the NanoPhase enviroment, please install, like using "mamba install -c bioconda package_name", then check it again
+## if still some packages were not in the NanoPhase enviroment, please install, using like command: "mamba install -c bioconda package_name", then check it again
 ```
 2). Install NanoPhase via conda
 ```

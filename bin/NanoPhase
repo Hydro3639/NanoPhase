@@ -532,6 +532,8 @@ genome_stats(){
 		Genome statistics finished @`date "+%Y/%m/%d -- %H:%M:%S"`
 		Final bins could be found in $OutDIR/03-Polishing/Final-bins/
 		and bin summary file is $OutDIR/03-Polishing/NanoPhase.ont.genome.summary" | sed -e 's/^[ \t]*//'
+		# clean up LongSeq clusters
+		rm -rf $OutDIR/03-Polishing/LongSeqs/
 	else
 		echo "===========================================================================================================
 		Something wrong with genome statistics of medaka-polished bins, terminating... @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'

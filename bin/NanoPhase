@@ -414,7 +414,7 @@ racon_polishing(){
 		echo "===========================================================================================================
 		racon polishing finished sucessfully @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
 		echo "*************************************************
-		racon parallel: $racon_para; racon threads: $racon_threads" ## should delete, only used in the test
+		racon parallel: $racon_para; racon threads: $racon_threads"
 	else
 		echo "===========================================================================================================
 		Something wrong with racon polishing, terminating...  @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
@@ -461,7 +461,7 @@ medaka_polishing(){
 		echo "===========================================================================================================
 		medaka polishing finished sucessfully @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
 		echo "*****************************************************
-		medaka parallel: $medaka_para; medaka threads: $medaka_threads" ## should delete, only used in the test
+		medaka parallel: $medaka_para; medaka threads: $medaka_threads"
 	else
 		echo "===========================================================================================================
 		Something wrong with medaka polishing, terminating...  @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
@@ -641,7 +641,7 @@ polypolish_polishing(){
 		echo "===========================================================================================================
 		polypolish polishing finished sucessfully @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
 		echo "*****************************************************
-		polypolish parallel: $polypolish_para; polypolish threads: $polypolish_threads" ## should delete, only used in the test
+		polypolish parallel: $polypolish_para; polypolish threads: $polypolish_threads"
 	else
 		echo "===========================================================================================================
 		Something wrong with polypolish polishing, terminating...  @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
@@ -721,7 +721,7 @@ polca_polishing(){
 	
 	if [[ ! -s $Polish_Path/tmp.polca.sucessful.binID ]]; then
 		echo "===========================================================================================================
-		No POLCA-polished bins has been found, terminating... @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
+		No POLCA-polished bin has been found, terminating... @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
 		exit 1
 	fi
 
@@ -732,7 +732,7 @@ polca_polishing(){
 			mv $Polish_Path/POLCA/${line}-polca.fasta $Polish_Path/POLCA/POLCA-bins/; done
 	else
 		echo -e "===========================================================================================================
-		Not all bins polished sucessfully by POLCA polishing
+		Not all bins were polished sucessfully by POLCA polishing
 		Bins: [`comm -13 <(sort $Polish_Path/tmp.polca.sucessful.binID) <(sort $Polish_Path/binIDs) | sort -t. -k2n | tr '\n' '\t' | sed -e 's/\t$//g'`] did not work, it should have little effect, so using polypolish-polished bins instead" | sed -e 's/^[ \t]*//'
 		comm -13 <(sort $Polish_Path/tmp.polca.sucessful.binID) <(sort $Polish_Path/binIDs) | while read line; do
 			cp $Polish_Path/Polypolish/${line}-Polypolish/${line}-polypolish.fasta $Polish_Path/POLCA/POLCA-bins/${line}-polca.fasta; done
@@ -752,7 +752,7 @@ polca_polishing(){
 		and remove reformated fq files" | sed -e 's/^[ \t]*//'
 		rm -rf $Polish_Path/ShortSeqs/*-sr_1.fq && rm -rf $Polish_Path/ShortSeqs/*-sr_2.fq
 		echo "*****************************************************
-		polca parallel: $polca_para; polca_threads: $polca_threads" ## should delete, only used in the test
+		polca parallel: $polca_para; polca_threads: $polca_threads"
 	else
 		echo "===========================================================================================================
 		Something wrong with POLCA polishing, terminating...  @`date "+%Y/%m/%d -- %H:%M:%S"`" | sed -e 's/^[ \t]*//'
@@ -889,7 +889,7 @@ elif [[ $Type = hybrid ]]; then
 			Paired-end fasta files have been provided, as fastq files were required for POLCA polishing, so a quality value of 30 will be used for fasta to fastq reformattings" | sed -e 's/^[ \t]*//'
 			long_read_check
 			echo "===========================================================================================================
-			Seems both short- and long-read files were prepared well. Now go to the next stage: package avaiablity checking" | sed -e 's/^[ \t]*//'
+			Seems both short- and long-read files have been prepared well. Now go to the next stage: package avaiablity checking" | sed -e 's/^[ \t]*//'
 			## hybrid strategy but without polca polishing
 			package_check && long_read_only_strategy && sr_polypolish_polca_polishing && hybrid_genome_stats && echo
 		elif [[ $SR1_seqs == *_1.fa ]] && [[ $SR2_seqs == *_2.fa ]]; then

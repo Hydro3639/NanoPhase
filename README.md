@@ -58,3 +58,4 @@ example usage:
         Nanophase -l ont.fastq -t 16 -o NanoPhase-out ## long reads only
         Nanophase -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out ## hybrid strategy
 ```
+<a href="https://www.revolvermaps.com/livestats/5isq3dkdu7g/"></a>

@@ -8,8 +8,20 @@
 NanoPhase is an easy-to-use pipeline to generate reference-quality MAGs using only Nanopore long reads or both Nanopore long and Illumina short reads (hybrid strategy) from complex metagenomes. If NanoPhase is interrupted, it will resume from the last completed stage.
 
 ### Installation instructions
-1). One of the most convenient and fast ways to install NanoPhase is create a NanoPhase env and using [mamba](https://github.com/mamba-org/mamba) to install/manage [all NanoPhase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md). It should be finished in ~5 mins (depends on your local internet).
-If mamba is not in the base environment, please use `conda install mamba -n base -c conda-forge` to install and follow the instruction to activate mamba.
+It is advised to first install [conda](https://docs.conda.io/en/latest/miniconda.html), then add required channels and install [mamba](https://github.com/mamba-org/mamba) following the instruction below:
+```
+conda config --add channels defaults
+conda config --add channels conda-forge
+conda config --add channels bioconda
+conda install mamba -n base -c conda-forge
+```
+1). Recommend: Install NanoPhase including [all NanoPhase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md) via conda/mamba. It should be finished in ~5 mins (depends on your local internet).
+```
+mamba create -n NanoPhase python=3.8 -y
+mamba activate NanoPhase
+mamba install -c nanophase nanophase -y
+```
+2). Alternative: Install NanoPhase via the source code
 ```
 git clone https://github.com/Hydro3639/NanoPhase.git
 source NanoPhase/bin/Install.sh
@@ -17,18 +29,9 @@ source NanoPhase/bin/Install.sh
 ```
 You may check if all necessary packages have been installed sucessfully in the NanoPhase env using the following command
 ```
-mamba activate NanoPhase
-## or conda activate NanoPhase
+conda activate NanoPhase ## if not in the NanoPhase env
 NanoPhase --check
-## if still some packages were not in the NanoPhase enviroment, please install, using like command: "mamba install -c bioconda package_name", then check it again
 ```
-2). Install NanoPhase via conda
-```
-mamba create -n NanoPhase python=3.8 -y
-mamba activate NanoPhase
-mamba install -c nanophase nanophase -y
-```
-Then you may check if all necessary packages existed using `NanoPhase --check`.
 If all pakcages have been installed sucessfully in the NanoPhase env, type `NanoPhase -h` for more usage information
 ```
 NanoPhase -h

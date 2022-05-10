@@ -14,6 +14,7 @@ conda config --add channels defaults
 conda config --add channels conda-forge
 conda config --add channels bioconda
 conda install mamba -n base -c conda-forge
+# then follow the terminal instruction to activate mamba (only once)
 ```
 1). Recommend: Install NanoPhase including [all NanoPhase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md) via conda/mamba. It should be finished in ~5 mins (depends on your local internet).
 ```
@@ -61,4 +62,4 @@ example usage:
         Nanophase -l ont.fastq -t 16 -o NanoPhase-out ## long reads only
         Nanophase -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out ## hybrid strategy
 ```
-<a href="https://www.revolvermaps.com/livestats/5isq3dkdu7g/"></a>
+

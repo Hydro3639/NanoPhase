@@ -13,8 +13,8 @@ It is advised to first install [conda](https://docs.conda.io/en/latest/miniconda
 conda config --add channels defaults
 conda config --add channels conda-forge
 conda config --add channels bioconda
-conda install mamba -n base -c conda-forge
-# then follow the terminal instruction to activate mamba (only once)
+conda install mamba -n base -c conda-forge -y
+mamba init && source ~/.bashrc ## only once
 ```
 1). Recommend: Install NanoPhase including [all NanoPhase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md) via conda/mamba. It should be finished in ~5 mins (depends on your local internet).
 ```

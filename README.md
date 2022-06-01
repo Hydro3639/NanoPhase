@@ -14,7 +14,7 @@ conda config --add channels defaults
 conda config --add channels conda-forge
 conda config --add channels bioconda
 conda install mamba -n base -c conda-forge -y
-mamba init && source ~/.bashrc ## only once
+mamba init && source ~/.bashrc ## only once, if mamba was still not in your local env, try opening a new terminal
 ```
 1). Recommend: Install NanoPhase including [all NanoPhase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md) via conda/mamba. It should be finished in ~5 mins (depends on your local internet).
 ```

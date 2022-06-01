@@ -8,7 +8,7 @@
 NanoPhase is an easy-to-use pipeline to generate reference-quality MAGs using only Nanopore long reads or both Nanopore long and Illumina short reads (hybrid strategy) from complex metagenomes. If NanoPhase is interrupted, it will resume from the last completed stage.
 
 ### Installation instructions
-It is advised to first install [conda](https://docs.conda.io/en/latest/miniconda.html), then add required channels and install [mamba](https://github.com/mamba-org/mamba) following the instruction below:
+It is advised to first install [conda](https://docs.conda.io/en/latest/miniconda.html)(`miniconda3` is suggested), then add required channels and install [mamba](https://github.com/mamba-org/mamba) following the instruction below:
 ```
 conda config --add channels defaults
 conda config --add channels conda-forge

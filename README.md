@@ -59,7 +59,7 @@ output sub-folders:
 
 example usage:
         NanoPhase --check ## package availability checking
-        Nanophase -l ont.fastq -t 16 -o NanoPhase-out ## long reads only
-        Nanophase -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out ## hybrid strategy
+        NanoPhase -l ont.fastq -t 16 -o NanoPhase-out ## long reads only
+        NanoPhase -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out ## hybrid strategy
 ```
 

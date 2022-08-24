@@ -1,0 +1,1024 @@
+#!/usr/bin/env bash
+## NanoPhase (meta) is designed for generating metagenome-assembled genomes (MAGs) from Nanopore metagenomic sequencing data or hybrid strategy
+set -eo pipefail
+
+
+###### Usage ######
+show_help(){
+cat << EOF
+
+`echo "NanoPhase v=$VERSION"`
+
+arguments:
+	--long_read_only	only Nanopore long reads were involved [default: on]
+	--hybrid		both short and long reads were required [Optional]
+	-l, --long		Nanopore reads: fasta/q file that basecalled by Guppy 5+ or using 20+ chemistry was recommended if only Nanopore reads were included [Mandatory]
+	-1			Illumina short reads: fasta/q paired-end #1 file [Optional]
+	-2			Illumina short reads: fasta/q paired-end #2 file [Optional]
+	-m, --medaka_model	medaka model used for medaka polishing [default: r941_min_hac_g507]
+	-t, --threads		number of threads that used for assembly and polishing [default: 16]
+	-o, --out		output directory [default: ./NanoPhase-out]
+	-h, --help		print help information and exit
+	-v, --version		show version number and exit
+
+output sub-folders:
+        01-LongAssemblies       sub-folder containing information of Nanopore long-read assemblies (assembler: metaFlye)
+        02-LongBins             sub-folder containing the initial bins with relatively low-accuracy quality
+        03-Polishing            sub-folder containing polished bins
+
+example usage:
+        NanoPhase meta -l ont.fastq -t 16 -o NanoPhase-out 						## long reads only
+        NanoPhase meta -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out 	## hybrid strategy
+
+EOF
+}
+
+## default parameters
+OPTIND=1 # Reset in case getopts has been used previously in the shell
+
+N_threads="16"
+Type="long_read_only"
+ONT_seqs=""
+#SR1_seqs=""
+#SR2_seqs=""
+CRTDIR=$(cd `dirname $0`; pwd)
+OutDIR="NanoPhase-out"
+check_pkg="false"
+medaka_model="r941_min_hac_g507"
+VERSION="0.2.0"
+
+## call command to tmp_cmd
+tmp_cmd=`echo -e "\nCommand line: $CRTDIR/NanoPhase meta $*"`
+##
+params="$(getopt -o hl:1:2:t:o:m:v --long help,hybrid,long:,long-read-only,threads:,medaka_model:,out:,check,version -- "$@")"
+if [[ $? -gt 0 ]]; then show_help; exit 1; fi
+if [[ $# == 0 ]]; then show_help; exit 1; fi
+
+#eval set -- "$params"
+#unset params
+
+while true; do
+	case "$1" in
+		-1) SR1_seqs=$2; shift 2;;
+		-2) SR2_seqs=$2; shift 2;;
+		-l | --long) ONT_seqs=$2; shift 2;;
+		-t | --threads) N_threads=$2; shift 2;;
+		-o | --out) OutDIR=$2; shift 2;;
+		-m | --medaka_model) medaka_model=$2; shift 2;;
+		-v | --version) echo "NanoPhase v=$VERSION"; exit 0; shift; break;;
+		--hybrid) Type=hybrid; shift 1;;
+		--long-read-only) Type=long_read_only; shift 1;;
+		-h | --help) show_help; exit 0; shift 1;;
+		--) show_help; exit 0; shift; break ;;
+		*) break;;
+	esac
+done
+
+## log file
+datetime.CHECK(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] CHECK:; }
+datetime.TASK(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] TASK:; }
+datetime.INFO(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] INFO:; }
+datetime.WARNING(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] WARNING:; }
+datetime.ERROR(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] ERROR:; }
+datetime.DONE(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] DONE:; }
+
+####################
+## start to run
+echo "`datetime.INFO` NanoPhase (meta) starts"
+echo `datetime.INFO` $tmp_cmd
+
+# Make sure the necessary files exist, if required variables are not setup, show help information and exit
+long_read_check(){
+if [[ ! -f "$ONT_seqs" ]]; then 
+	echo "`datetime.ERROR` Input Nanopore long-read file does NOT exist. Please type 'NanoPhase -h' for help"
+	exit 1
+elif [[ $ONT_seqs == *fasta ]] || [[ $ONT_seqs == *fa ]]; then
+	lr_suffix=fa && sub_lr_suffix=fa
+	echo "`datetime.CHECK` Nanopore long-read (fasta) file has been found"
+elif [[ $ONT_seqs == *fastq ]] || [[ $ONT_seqs == *fq ]]; then
+	lr_suffix=fq && sub_lr_suffix=fq
+	echo "`datetime.CHECK` Nanopore long-read (fastq) file has been found"
+elif [[ $ONT_seqs == *fasta.gz ]] || [[ $ONT_seqs == *fa.gz ]] ; then
+	lr_suffix=fa.gz && sub_lr_suffix=fa
+	echo "`datetime.CHECK` Nanopore long-read (fa.gz) file has been found"
+elif [[ $ONT_seqs == *fastq.gz ]] || [[ $ONT_seqs == *fq.gz ]] ; then
+	lr_suffix=fq.gz && sub_lr_suffix=fq
+	echo "`datetime.CHECK` Nanopore long-read (fq.gz) file has been found"
+else
+	echo "`datetime.ERROR` the input long-read file has unsupported format extension (valid extensions: .fasta, .fasta.gz, .fa, .fa.gz, .fastq, .fastq.gz, .fq, .fq.gz)!"
+	show_help; exit 1
+fi
+}
+
+short_read_check(){
+if [[ -f $SR1_seqs ]] && [[ ! -f $SR2_seqs ]]; then
+        echo "`datetime.ERROR` PE#1 has been found; but cannot find short-read PE#2 file, terminating..."
+        show_help; exit 1
+elif [[ ! -f $SR1_seqs ]] && [[ -f $SR2_seqs ]]; then
+        echo "`datetime.ERROR` PE#2 has been found, but cannot find short-read PE#1 file, terminating..."
+        show_help; exit 1
+elif [[ ! -f $SR1_seqs ]] && [[ ! -f $SR2_seqs ]]; then
+        echo "`datetime.ERROR` Cannot find short-read PE#1 and PE#2 files, terminating..."
+        show_help; exit 1
+elif [[ $SR1_seqs == $SR2_seqs ]] && [[ -f $SR1_seqs ]]; then
+        echo "`datetime.ERROR` PE files provided were the same, please check, terminating..."
+        show_help; exit 1
+elif [[ -f $SR1_seqs ]] && [[ -f $SR2_seqs ]]; then
+        if [[ $SR1_seqs == *_1.fasta ]] && [[ $SR2_seqs == *_2.fasta ]]; then
+		sr_suffix=fa && sub_sr_suffix=fa
+		echo "`datetime.CHECK` PE (fasta) files have been provided, as fastq files were required for POLCA polishing, so a quality value of 30 will be used for fasta to fastq reformattings"
+        elif [[ $SR1_seqs == *_1.fa ]] && [[ $SR2_seqs == *_2.fa ]]; then
+                sr_suffix=fa && sub_sr_suffix=fa
+		echo "`datetime.CHECK` PE (fa) files have been provided, as fastq files were required for POLCA polishing, so a quality value of 30 will be used for fasta to fastq reformattings"
+        elif [[ $SR1_seqs == *_1.fastq ]] && [[ $SR2_seqs == *_2.fastq ]]; then
+		sr_suffix=fq && sub_sr_suffix=fq
+		echo "`datetime.CHECK` PE (fastq) files have been provided" 
+        elif [[ $SR1_seqs == *_1.fq ]] && [[ $SR2_seqs == *_2.fq ]]; then
+                sr_suffix=fq && sub_sr_suffix=fq
+		echo "`datetime.CHECK` PE (fq) files have been provided"
+	elif [[ $SR1_seqs == *_1.fasta.gz ]] && [[ $SR2_seqs == *_2.fasta.gz ]]; then
+		sr_suffix=fa.gz && sub_sr_suffix=fa
+		echo "`datetime.CHECK` PE (fasta.gz) files have been provided"
+	elif [[ $SR1_seqs == *_1.fa.gz ]] && [[ $SR2_seqs == *_2.fa.gz ]]; then
+		sr_suffix=fa.gz && sub_sr_suffix=fa
+		echo "`datetime.CHECK` PE (fa.gz) files have been provided"
+	elif [[ $SR1_seqs == *_1.fastq.gz ]] && [[ $SR2_seqs == *_2.fastq.gz ]]; then
+		sr_suffix=fq.gz && sub_sr_suffix=fq
+		echo "`datetime.CHECK` PE (fastq.gz) files have been provided"
+	elif [[ $SR1_seqs == *_1.fq.gz ]] && [[ $SR2_seqs == *_2.fq.gz ]]; then
+		sr_suffix=fq.gz && sub_sr_suffix=fq
+		echo "`datetime.CHECK` PE (fq.gz) files have been provided"
+	else
+                echo "`datetime.ERROR` the input short-read file has unsupported format extension (valid extensions: _1/2.fasta, _1/2.fasta.gz, _1/2.fa, _1/2.fa.gz, _1/2.fastq, _1/2.fastq.gz, _1/2.fq, _1/2.fq.gz)!" 
+                show_help; exit 1
+        fi
+else
+        echo "`datetime.ERROR` Short-read files do NOT exist, terminating..."
+        show_help; exit 1
+fi
+}
+
+#shift $((OPTIND - 1))
+
+package_check(){
+### Software availability
+echo  "`datetime.CHECK` Check software availability and locations"
+mkdir -p $OutDIR && rm -rf $OutDIR/.package.installed 2>/dev/null && rm -rf $OutDIR/.package.not.installed 2>/dev/null
+
+## all required packages
+echo -e "NanoPhase\nflye\nmetabat2\nrun_MaxBin.pl\nmetawrap\ncheckm\nracon\nmedaka\npolypolish\npolca.sh\nbwa\nseqtk\nminimap2\nstats.sh\nparallel\nperl\nsamtools\ngtdbtk\nfastANI" | while read package; do
+if [[ "$(command -v $package)" ]]; then
+	echo -e "$package\t`which $package`" | sed -e 's/polca.sh/POLCA/1' -e 's/run_MaxBin.pl/maxbin2/1' -e 's/stats.sh/BBMap/g' | awk '{printf "%-20s %s\n", $1,$2}' >> $OutDIR/.package.installed
+else
+	echo "$package" | sed -e 's/polca.sh/POLCA/1' -e 's/run_MaxBin.pl/maxbin2/1' -e 's/stats.sh/BBMap/g' | awk '{printf "%-20s %s\n", $1,$2}' >> $OutDIR/.package.not.installed
+fi ; done
+
+if [[ -s $OutDIR/.package.installed ]]; then
+	echo "`datetime.INFO` The following packages have been found"
+	cat $OutDIR/.package.installed | sed -e '1i#package\tlocation' | awk '{printf "%-20s %s\n", $1,$2}'
+else
+	echo "`datetime.ERROR` No required package has been found in the environment, please install, terminating..."
+	exit 1
+fi
+
+if [[ ! -s $OutDIR/.package.not.installed ]]; then
+	echo "All required packages have been found in the environment"
+	path_check=`cat  $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | awk '!a[$1]++' | wc -l`
+	if [[ $path_check -gt 1 ]]; then
+		echo "Warning: [`cat  $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | grep -v 'NanoPhase\/bin' | while read line; do grep -w $line $OutDIR/.package.installed; done | awk '!a[$1]++ {print $1}' | tr '\n' ' ' | sed -e 's/ $//g'`] has not been installed in the [NanoPhase] env. Strongly recommend installing all packages in the NanoPhase env, or it may result in a failure"
+		rm -rf  $OutDIR/.package.installed
+	else
+		rm -rf $OutDIR/.package.installed 2>/dev/null
+	fi
+else
+	echo "`datetime.ERROR` [`cat $OutDIR/.package.not.installed | sed -e 's/ //g' | tr '\n' ' ' | sed -e 's/ $//g'`] cannot be found in the environment, plase install. Now terminating..."
+	rm -rf $OutDIR/.package.not.installed
+	exit 1
+fi
+}
+
+long_read_only_strategy(){
+### long-read assembly
+long_read_assembly(){
+	if [[ $N_threads -gt 128 ]]; then
+		flye_threads=128
+	else
+		flye_threads=$N_threads
+	fi
+	
+	## assembly
+        flye --meta --nano-hq $ONT_seqs -t $flye_threads -i 2 -g 5m -o $OutDIR/01-LongAssemblies/tmp >/dev/null 2>&1
+	
+	flye_pass=`grep "Final assembly" <(tail -1 $OutDIR/01-LongAssemblies/tmp/flye.log) | wc -l`
+	if [[ $flye_pass != 1 ]]; then
+		echo "`datetime.ERROR` Something wrong with long-read (metaflye) assembly, please also check $OutDIR/01-LongAssemblies/tmp/flye.log for more information, terminating..."
+		exit 1; >&2
+	fi
+
+	mv $OutDIR/01-LongAssemblies/tmp/assembly.fasta $OutDIR/01-LongAssemblies/tmp/assembly_info.txt $OutDIR/01-LongAssemblies/tmp/flye.log $OutDIR/01-LongAssemblies
+	
+	if [ -f $OutDIR/01-LongAssemblies/assembly.fasta -a -f $OutDIR/01-LongAssemblies/assembly_info.txt ]; then
+		echo "`datetime.DONE` long-read assembly finished sucessfully: detailed log file is $OutDIR/01-LongAssemblies/flye.log"
+		rm -rf $OutDIR/01-LongAssemblies/tmp
+	else
+		echo "`datetime.ERROR` Something wrong with long-read assembly, terminating..."
+		exit 1; >&2
+	fi
+}
+
+if [ -f $OutDIR/01-LongAssemblies/assembly.fasta -a -f $OutDIR/01-LongAssemblies/assembly_info.txt ]; then
+	echo "`datetime.INFO` long-read assembly has been found in the folder: $OutDIR/01-LongAssemblies/. Now go to the next stage: generating LongBins...
+	Note: plese ensure flye assembly finished sucessfully in the previous run, if not, please remove this folder using the command 'rm -rf $OutDIR/$OutDIR/01-LongAssemblies/' and re-run NanoPhase command"
+else
+	if [[ -d $OutDIR/01-LongAssemblies ]]; then
+		echo "`datetime.INFO` Long-read assembly re-starts (be patient)"
+	else
+		echo "`datetime.TASK` Long-read assembly starts (be patient)"
+		mkdir -p $OutDIR/01-LongAssemblies
+	fi
+	long_read_assembly
+fi
+
+### Initial Bins
+## metabat
+metabat_binning(){
+	grep '^>' $OutDIR/01-LongAssemblies/assembly.fasta | sed -e 's/^>//g' | while read line; do grep -w $line $OutDIR/01-LongAssemblies/assembly_info.txt ; done | cut -f1,3 > $OutDIR/02-LongBins/INITIAL_BINNING/tmp.abun.txt
+	sed -e '1i#seq_name\tcov' $OutDIR/02-LongBins/INITIAL_BINNING/tmp.abun.txt > $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/metabat2_abun.txt
+	metabat2 -t $N_threads -i $OutDIR/01-LongAssemblies/assembly.fasta -o $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/metabat2-bins/bin -a $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/metabat2_abun.txt --cvExt >$OutDIR/02-LongBins/INITIAL_BINNING/metabat2/bin.log
+
+	if [ -s $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/bin.log ]; then
+		str_check=`grep "formed" $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/bin.log | wc -l`
+		if [[ $str_check == 1 ]]; then
+			echo "`datetime.DONE` Initial binning::metabat2 binning finished sucessfully
+			`cat $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/bin.log`" | sed -e 's/^[ \t]*//'
+		else
+			echo "`datetime.ERROR` Something wrong with metabat2 binning, please also check $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/bin.log, terminating..." 
+			exit 1
+		fi
+	else
+		echo "`datetime.ERROR` Something wrong with metabat2 binning, terminating..."
+		exit 1
+	fi
+}
+
+str_metabat2=`grep "formed" $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/bin.log 2>/dev/null | wc -l`
+if [ -s $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/bin.log ] && [[ $str_metabat2 == 1 ]] && [[ -s $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/metabat2-bins/bin.1.fa ]]; then
+	echo "`datetime.INFO` metabat2 bins have been found in the folder: $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/metabat2-bins/. Now go to the next stage: maxbin2 binning...
+	Note: please ensure metabat2 binning finished sucessfully in the previous run, if not, please remove this folder using the command 'rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/metabat2' and re-run NanoPhase command"
+else
+	if [[ -d $OutDIR/02-LongBins/INITIAL_BINNING/metabat2 ]]; then
+		echo "`datetime.INFO` metabat2 binning re-starts"
+		rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/*
+	else
+		if [[ -d $OutDIR/02-LongBins/INITIAL_BINNING ]]; then
+			echo "`datetime.INFO` metabat2 binning re-starts"
+		else
+			if [[ -d $OutDIR/02-LongBins ]]; then
+				echo "`datetime.INFO` Initial binning re-starts"
+			else
+				echo "`datetime.TASK` Initial binning::metabat2 binning starts"
+				mkdir -p $OutDIR/02-LongBins
+			fi
+			mkdir -p $OutDIR/02-LongBins/INITIAL_BINNING
+		fi
+		mkdir -p $OutDIR/02-LongBins/INITIAL_BINNING/metabat2
+	fi
+	metabat_binning
+fi
+
+## maxbin
+maxbin_binning(){
+	cp $OutDIR/02-LongBins/INITIAL_BINNING/tmp.abun.txt $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2_abun.txt
+	run_MaxBin.pl -thread $N_threads -contig $OutDIR/01-LongAssemblies/assembly.fasta -abund $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2_abun.txt -out $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/bin 1>/dev/null
+	mkdir -p $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2-bins
+	mv $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/bin*fasta $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2-bins/
+
+	if [ -s $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/bin.log ]; then
+		str_check=`grep "Job finished" $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/bin.log | wc -l`
+		 if [[ $str_check == 1 ]] && [[ -s $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2-bins/bin.001.fasta ]]; then
+			 echo "`datetime.DONE` Initial binning::maxbin2 binning finished sucessfully"
+			 echo "`sed -n '/========== Job finished ==========/,$p' $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/bin.log | awk '$NF' | tail -n+2 | head -n -4`" 
+
+		 else
+			 echo "`datetime.ERROR` Something wrong with maxbin binning, please also check $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/bin.log, terminating..."
+			 exit 1; >&2
+		 fi
+	 else
+		  
+		 echo "`datetime.ERROR` Something wrong with maxbin binning, terminating..."
+		 exit 1; >&2
+	 fi
+}
+
+str_maxbin2=`grep "Job finished" $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/bin.log 2>/dev/null | wc -l`
+if [ -s $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/bin.log ] && [[ $str_maxbin2 == 1 ]] && [[ -s $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2-bins/bin.001.fasta ]]; then
+	echo "`datetime.INFO` maxbin2 bins have been found in the folder $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2-bins/. Now go to the next stage: bin refinement...
+	Note: please ensure maxbin2 binning finished sucessfully in the previous run, if not, please remove this folder using the command 'rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/' and re-run NanoPhase command"
+else
+	if [[ -d $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2 ]]; then
+		echo "`datetime.INFO` maxbin2 binning re-starts" 
+		rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/*
+	else
+		echo "`datetime.TASK` Initial binning::maxbin2 binning starts"
+		mkdir -p $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2
+	fi
+	maxbin_binning
+fi
+
+## metawarp bin_refinement
+bin_refinement(){
+	metawrap bin_refinement -o $OutDIR/02-LongBins/BIN_REFINEMENT -c 50 -x 10 -t $N_threads -A $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/metabat2-bins/ -B $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2-bins/ >$OutDIR/02-LongBins/BIN_REFINEMENT/bin_refinement.log 2>&1
+	# if biopython error, may try python3
+	Fin_Num_refineBins=`ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*.fa 2>/dev/null | wc -l`
+	if [[ -s $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats ]] && [[ `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` == $Fin_Num_refineBins ]]; then
+		echo -e "`datetime.DONE` bin refinement finished sucessfully: detailed log file is $OutDIR/02-LongBins/BIN_REFINEMENT/bin_refinement.log" 
+		rm -rf $OutDIR/02-LongBins/BIN_REFINEMENT/work_files
+	else
+		echo "`datetime.ERROR` Something wrong with bin refinement, please also check $OutDIR/02-LongBins/BIN_REFINEMENT/bin_refinement.log, terminating..." 
+		exit 1; >&2
+	fi
+}
+
+Num_refineBins=`ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*.fa  2>/dev/null | wc -l`
+if [[ -s $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats ]] && [[ `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` == $Num_refineBins ]]; then
+	echo "`datetime.INFO` refined bins have been found in the folder $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/. Now go to the next stage: long-read polishing: combine refined bins...
+	Note: please ensure bin refinement finished sucessfully in the previous run, if not, please remove this folder using the command 'rm -rf $OutDIR/02-LongBins/BIN_REFINEMENT/' and re-run NanoPhase command"
+else
+	if [[ -d $OutDIR/02-LongBins/BIN_REFINEMENT ]]; then
+		echo "`datetime.INFO` bin refinement re-starts"
+		rm -rf $OutDIR/02-LongBins/BIN_REFINEMENT/*
+	else
+		echo "`datetime.TASK` bin refinement starts"
+		mkdir -p $OutDIR/02-LongBins/BIN_REFINEMENT
+	fi
+	bin_refinement
+fi
+
+### long-read polishing
+## 03-Polishing
+## Preparation
+LongCluster(){
+
+prepare(){
+	mkdir -p $OutDIR/03-Polishing/rename-bins
+	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
+	cat $OutDIR/03-Polishing/binIDs | while read line; do sed -e 's/^>/>'${line}_'/g' $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/${line}.fa > $OutDIR/03-Polishing/rename-bins/${line}.fa ; done
+	cat $OutDIR/03-Polishing/rename-bins/bin.*fa > $OutDIR/03-Polishing/flye_assembled.bins.fasta
+	
+	if [[ -s $OutDIR/03-Polishing/flye_assembled.bins.fasta ]]; then
+		echo "`datetime.INFO` long-read candidate bins were combined sucessfully"
+	else
+		echo "`datetime.ERROR` Something wrong with combining long-read candidate bins, terminating..."
+		exit 1; >&2
+	fi
+}
+
+if [[ -s $OutDIR/03-Polishing/flye_assembled.bins.fasta ]]; then
+	echo "`datetime.INFO` refined bins have been combined. Now go to the next stage: generating LongSeqs clusters of candidate bins..."
+else
+	if [[ -d $OutDIR/03-Polishing ]]; then
+		echo "`datetime.INFO` long-read polishing re-starts"
+		rm -rf $OutDIR/03-Polishing/rename-bins
+	else
+		echo "`datetime.TASK` long-read polishing starts"
+		mkdir -p $OutDIR/03-Polishing
+	fi
+	prepare
+fi
+
+#LongCluster
+	minimap2 -x map-ont -t $N_threads $OutDIR/03-Polishing/flye_assembled.bins.fasta $ONT_seqs > $OutDIR/03-Polishing/flye_bins-mapping.lr.paf 2>/dev/null
+	awk '!a[$1]++' $OutDIR/03-Polishing/flye_bins-mapping.lr.paf | awk -F'[:\t]' '($4-$3+1)/$2 >=0.90 && $27<0.10 {print $1"\t"$6}' > $OutDIR/03-Polishing/filtered_90_90-lr.paf
+	cat $OutDIR/03-Polishing/binIDs | while read line; do echo "grep ${line}_contig $OutDIR/03-Polishing/filtered_90_90-lr.paf | awk '{print \$1}' > $OutDIR/03-Polishing/LongSeqs/${line}-lr.IDs"; done > $OutDIR/03-Polishing/tmp.lr-extra-IDs.cmd
+	#chmod +x $OutDIR/03-Polishing/tmp.lr-extra-IDs.cmd
+	parallel -j$N_threads -k < $OutDIR/03-Polishing/tmp.lr-extra-IDs.cmd
+	
+	cat $OutDIR/03-Polishing/binIDs | while read line; do echo "seqtk subseq $ONT_seqs $OutDIR/03-Polishing/LongSeqs/${line}-lr.IDs > $OutDIR/03-Polishing/LongSeqs/${line}-lr.${sub_lr_suffix}"; done  > $OutDIR/03-Polishing/tmp.seqtk-lr.cmd
+
+	## parallel commands
+	if [[ $N_threads -gt 15 ]]; then
+		#chmod +x $OutDIR/03-Polishing/tmp.seqtk-lr.cmd
+		parallel -j15 -k < $OutDIR/03-Polishing/tmp.seqtk-lr.cmd # reduce the I/O burden
+	else
+		#chmod +x $OutDIR/03-Polishing/tmp.seqtk-lr.cmd
+		parallel -j$N_threads -k < $OutDIR/03-Polishing/tmp.seqtk-lr.cmd
+	fi
+	rm -rf $OutDIR/03-Polishing/*lr.paf && rm -rf $OutDIR/03-Polishing/tmp.lr-extra-IDs.cmd && rm -rf $OutDIR/03-Polishing/tmp.seqtk-lr.cmd
+	
+	Fin_Num_LongSeq=`find $OutDIR/03-Polishing/LongSeqs/ -name "*${sub_lr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+	if [[ $Fin_Num_LongSeq == `wc -l $OutDIR/03-Polishing/binIDs | awk '{print $1}'` ]]; then
+		echo "`datetime.DONE` LongSeqs clustering finished sucessfully"
+	else
+		echo "`datetime.ERROR` Something wrong with LongSeqs clustering, terminating ..."
+		exit 1; >&2
+	fi	
+}
+
+LongCluster_check(){
+Num_LongSeq=`find $OutDIR/03-Polishing/LongSeqs/ -name "*${sub_lr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+if [[ $Num_LongSeq == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]]; then
+	echo "`datetime.INFO` LongSeq clusters have been generated. Now go to the next stage: racon polishing..."
+else
+	if [[ -d $OutDIR/03-Polishing/LongSeqs ]]; then
+		echo "`datetime.INFO` LongSeqs clustering re-starts"
+		rm -rf $OutDIR/03-Polishing/LongSeqs/*
+	else
+		echo "`datetime.TASK` LongSeqs clustering starts" 
+		mkdir -p $OutDIR/03-Polishing/LongSeqs
+	fi
+	LongCluster
+fi
+}
+
+## racon polishing
+racon_polishing(){
+	if [[ $N_threads -gt 20 ]]; then
+		racon_threads=20
+		let racon_t=($N_threads+10)/20
+		racon_para=$racon_t
+	else
+		racon_threads=$N_threads
+		racon_para=1
+	fi
+	
+	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
+	cat $OutDIR/03-Polishing/binIDs | while read line; do
+	echo "mkdir -p $OutDIR/03-Polishing/Racon/${line} && minimap2 -x map-ont -d $OutDIR/03-Polishing/rename-bins/${line}.fa.mni $OutDIR/03-Polishing/rename-bins/${line}.fa && minimap2 -ax map-ont -t $racon_threads $OutDIR/03-Polishing/rename-bins/${line}.fa.mni $OutDIR/03-Polishing/LongSeqs/${line}-lr.${sub_lr_suffix} > $OutDIR/03-Polishing/Racon/${line}/overlaps.racon1.sam && racon -t $racon_threads $OutDIR/03-Polishing/LongSeqs/${line}-lr.${sub_lr_suffix} $OutDIR/03-Polishing/Racon/${line}/overlaps.racon1.sam $OutDIR/03-Polishing/rename-bins/${line}.fa  > $OutDIR/03-Polishing/Racon/${line}/${line}-racon01.fasta && rm -rf $OutDIR/03-Polishing/rename-bins/${line}.fa.* && rm -rf $OutDIR/03-Polishing/Racon/${line}/overlaps.racon1.sam"; done > $OutDIR/03-Polishing/tmp.racon.cmd
+	#chmod +x $OutDIR/03-Polishing/tmp.racon.cmd
+	parallel -j$racon_para -k < $OutDIR/03-Polishing/tmp.racon.cmd >$OutDIR/03-Polishing/Racon/racon.polish.log 2>&1
+	rm -rf $OutDIR/03-Polishing/tmp.racon.cmd 
+	
+	Fin_Num_racon_bin=`find $OutDIR/03-Polishing/Racon/ -name "*racon01.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+	if [[ $Fin_Num_racon_bin == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]]; then
+		echo -e "`datetime.DONE` racon polishing finished sucessfully: detailed log file is $OutDIR/03-Polishing/Racon/racon.polish.log"
+		echo "**************************************************************************************
+		racon parallel: $racon_para; racon threads: $racon_threads"
+		rm -rf $OutDIR/03-Polishing/rename-bins/
+	else
+		echo "`datetime.ERROR` Something wrong with racon polishing, please also check $OutDIR/03-Polishing/Racon/racon.polish.log, terminating..."
+		exit 1; >&2
+	fi
+}
+
+racon_polishing_check(){
+Num_racon_bin=`find $OutDIR/03-Polishing/Racon/ -name "*racon01.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+if [[ $Num_racon_bin == `wc -l $OutDIR/03-Polishing/binIDs | awk '{print $1}'` ]]; then
+	echo "`datetime.INFO` racon polishing has been finished. Now go to the next stage: medaka polishing..."
+else
+	if [[ -d $OutDIR/03-Polishing/Racon ]]; then
+		echo "`datetime.INFO` racon polishing re-starts" 
+		rm -rf $OutDIR/03-Polishing/Racon/*
+	else
+		echo "`datetime.TASK` racon polishing starts"
+		mkdir -p $OutDIR/03-Polishing/Racon
+	fi
+	racon_polishing
+fi
+}
+
+## medaka polishing
+medaka_polishing(){
+	if [[ $N_threads -gt 4 ]]; then
+		medaka_threads=2
+		#medaka_para=`echo -e "$N_threads/2"|bc`
+		let medaka_p=$N_threads/2
+		medaka_para=$medaka_p
+	else
+		medaka_threads=$N_threads
+		medaka_para=1
+	fi
+
+	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
+	cat $OutDIR/03-Polishing/binIDs | while read line; do
+	echo "medaka_consensus -m $medaka_model -i $OutDIR/03-Polishing/LongSeqs/${line}-lr.${sub_lr_suffix} -d $OutDIR/03-Polishing/Racon/${line}/${line}-racon01.fasta -o $OutDIR/03-Polishing/medaka/${line}-medaka -t $medaka_threads && rm -rf $OutDIR/03-Polishing/medaka/${line}-medaka/calls_to* && rm -rf $OutDIR/03-Polishing/medaka/${line}-medaka/consensus_probs.hdf && rm -rf $OutDIR/03-Polishing/medaka/${line}-medaka/consensus.fasta.gaps_in_draft_coords.bed"; done > $OutDIR/03-Polishing/tmp.medaka.cmd
+	#chmod +x $OutDIR/03-Polishing/tmp.medaka.cmd
+	parallel -j$medaka_para -k <$OutDIR/03-Polishing/tmp.medaka.cmd >$OutDIR/03-Polishing/medaka/medaka.polish.log 2>&1
+	rm -rf $OutDIR/03-Polishing/tmp.medaka.cmd
+	cat $OutDIR/03-Polishing/binIDs | while read line; do rm -rf $OutDIR/03-Polishing/Racon/${line}/${line}-racon01.fasta.* ; done
+
+	Fin_Num_medaka_bin=`find $OutDIR/03-Polishing/medaka/ -name "consensus.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+	if [[ $Fin_Num_medaka_bin == `wc -l $OutDIR/03-Polishing/binIDs | awk '{print $1}'` ]] ; then
+		echo "`datetime.DONE` medaka polishing finished sucessfully: detailed log file is $OutDIR/03-Polishing/medaka/medaka.polish.log"
+		echo "**************************************************************************************
+		medaka parallel: $medaka_para; medaka threads: $medaka_threads"
+	else
+		echo "`datetime.ERROR` Something wrong with medaka polishing, please also check $OutDIR/03-Polishing/medaka/medaka.polish.log, terminating..."
+		exit 1; >&2
+	fi
+}
+
+medaka_polishing_check(){
+Num_medaka_bin=`find $OutDIR/03-Polishing/medaka/ -name "consensus.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+if [[ $Num_medaka_bin == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]] ; then
+	if [[ $Type == hybrid ]]; then
+		echo "`datetime.INFO` medaka polishing has been finished. Now go to the next stage: polypolish polishing" 
+	else
+		echo "`datetime.DONE` medaka polishing has been finished. Now go to the next stage: bin quality assessement and genome classification"
+	fi
+
+else
+	if [[ -d $OutDIR/03-Polishing/medaka ]]; then
+		echo "`datetime.INFO` medaka polishing re-starts"
+		rm -rf $OutDIR/03-Polishing/medaka/*
+	else
+		echo "`datetime.TASK` medaka polishing starts"
+		mkdir -p $OutDIR/03-Polishing/medaka/
+	fi
+	medaka_polishing
+fi
+}
+
+Num_LongSeq=`find $OutDIR/03-Polishing/LongSeqs/ -name "*${sub_lr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+Num_racon_bin=`find $OutDIR/03-Polishing/Racon/ -name "*racon01.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+Num_medaka_bin=`find $OutDIR/03-Polishing/medaka/ -name "consensus.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+
+#if [[ $Num_medaka_bin == $Num_racon_bin ]] && [[ $Num_medaka_bin == `cat $OutDIR/03-Polishing/binIDs | wc -l` ]]; then
+if [[ $Num_medaka_bin == $Num_racon_bin ]] && [[ $Num_medaka_bin == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]]; then
+	medaka_polishing_check
+else
+	LongCluster_check && racon_polishing_check && medaka_polishing_check && echo
+fi
+}
+
+## checkm: genome quality evaluation
+long_read_only_genome_stats(){
+genome_stats(){
+	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
+	cat $OutDIR/03-Polishing/binIDs | while read line; do cp $OutDIR/03-Polishing/medaka/${line}-medaka/consensus.fasta $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins/${line}.medaka.fasta; done
+	
+	## checkm assessement
+	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]] && [[ `wc -l $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness | awk '{print $1}'` == `cat $OutDIR/03-Polishing/binIDs | wc -l` ]]; then
+		echo "`datetime.INFO` genome quality assessment has been finished. Now, go to the next stage: genome classification"
+	else
+		echo "`datetime.TASK` genome quality assessment starts"
+		checkm lineage_wf -x fasta -t $N_threads $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins $OutDIR/03-Polishing/Final-bins/checkm-output >$OutDIR/03-Polishing/Final-bins/checkm.log 2>/dev/null
+		echo "`cat $OutDIR/03-Polishing/Final-bins/checkm.log`"
+		
+		##
+		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '! /^-------------------/' >$OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness
+		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10' > $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness
+
+		if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]] && [[ `wc -l $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness | awk '{print $1}'` == `cat $OutDIR/03-Polishing/binIDs | wc -l` ]]; then
+			echo "`datetime.DONE` genome quality assessment finished sucessfully. Now, go to the next stage: genome classification"
+		else
+			echo "`datetime.ERROR` Something wrong with checkm process, terminating..."
+			exit 1; >&2
+		fi
+	fi
+
+	## check BBMap
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do stats.sh $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins/${line}.fasta format=6 | grep -v "#" | awk '{print $3"\t"$1"\t"$9"\t"$18}'; done > $OutDIR/03-Polishing/Final-bins/tmp.genome-stats
+
+        if [[ ! -s $OutDIR/03-Polishing/Final-bins/tmp.genome-stats ]]; then
+		echo "`datetime.ERROR` Something wrong with BBMap::stats.sh, terminating..."
+		exit 1; >&2
+        fi
+	
+	## filtering genome quality based on completeness (>=50%) and contamination (<=10%): should add command option in the next version update.
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do mv $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins/${line}.fasta $OutDIR/03-Polishing/Final-bins/ ; done
+
+	## Taxa info
+	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]] && [[ `cat $OutDIR/03-Polishing/Final-bins/tmp.taxa | wc -l` == `ls $OutDIR/03-Polishing/Final-bins/*fasta | wc -l` ]]; then
+		echo "`datetime.INFO` GTDB::Taxa has been finished sucessfully"
+	else
+		echo "`datetime.TASK` Genome taxa classification starts"
+		gtdbtk classify_wf --genome_dir $OutDIR/03-Polishing/Final-bins/ -x fasta --out_dir $OutDIR/03-Polishing/Final-bins/tmp --cpus $N_threads >/dev/null 2>&1
+		echo "`cat $OutDIR/03-Polishing/Final-bins/tmp/gtdbtk.log`"
+		echo "`datetime.DONE` genome classification done"
+
+		cat $OutDIR/03-Polishing/Final-bins/tmp/classify/gtdbtk.*summary.tsv | grep -v '^user_genome' | awk '{print $1"\t"$2}' > $OutDIR/03-Polishing/Final-bins/tmp.taxa
+		
+		if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]] && [[ `cat $OutDIR/03-Polishing/Final-bins/tmp.taxa | wc -l` == `ls $OutDIR/03-Polishing/Final-bins/*fasta | wc -l` ]]; then
+			echo "`datetime.DONE` GTDB::Taxa finished sucessfully"
+		else
+			echo "`datetime.ERROR` Something wrong with GTDB::Taxa process, terminating..."
+			exit 1; >&2
+		fi
+	fi
+	
+	## data combination
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
+
+	paste $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness $OutDIR/03-Polishing/Final-bins/tmp.genome-stats $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted | sort -t. -k2n | sed -e 's/.medaka//g' > $OutDIR/03-Polishing/tmp.NanoPhase.genome.summary
+	
+	## extract circular Info from flye assemblies
+	cat $OutDIR/03-Polishing/tmp.NanoPhase.genome.summary | awk '{print $1"\t"$6}' | while read binID N_Contig; do
+	if [[ $N_Contig == 1 ]]; then
+		grep "^>" $OutDIR/03-Polishing/Final-bins/${binID}.medaka.fasta | cut -d_ -f2-3 | while read ContigID; do grep -w $ContigID $OutDIR/01-LongAssemblies/assembly_info.txt ; done | awk '{print $4}' | while read CirInfo; do
+		if [[ $CirInfo == Y ]]; then 
+			echo "Y"
+		else
+			echo "N"
+		fi; done
+	else
+		echo "N"
+	fi; done | paste $OutDIR/03-Polishing/tmp.NanoPhase.genome.summary - | awk -F"\t" -v OFS="\t" '{temp = $9; $9 = $10; $10 = temp; print $0}' | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tIfCir.\tGTDB-Taxa' > $OutDIR/03-Polishing/NanoPhase.ont.genome.summary
+	
+	# clean up and rename
+	rm -rf $OutDIR/03-Polishing/Final-bins/tmp* && rm -rf $OutDIR/03-Polishing/Final-bins/checkm* && rm -rf $OutDIR/03-Polishing/tmp.NanoPhase.genome.summary 
+	#rename 's/medaka\.fasta/fasta/' $OutDIR/03-Polishing/Final-bins/*fasta ## linux-rename not equal perl-rename
+	ls $OutDIR/03-Polishing/Final-bins/*medaka.fasta | sed -e "s/.medaka.fasta//g" | while read line; do mv ${line}.medaka.fasta ${line}.fasta; done
+
+	Fin_Num_final_bins=`ls -lht $OutDIR/03-Polishing/Final-bins/*fasta 2>/dev/null | awk '$5!=0' | wc -l`
+	if [[ -s $OutDIR/03-Polishing/NanoPhase.ont.genome.summary ]] && [[ $Fin_Num_final_bins == `tail -n+2 $OutDIR/03-Polishing/NanoPhase.ont.genome.summary | wc -l | awk '{print $1}'` ]]; then
+		echo "`datetime.DONE` Genome statistics finished
+		Final bins could be found in $OutDIR/03-Polishing/Final-bins/ and
+		bin summary file is $OutDIR/03-Polishing/NanoPhase.ont.genome.summary"
+		# clean up LongSeq clusters
+		rm -rf $OutDIR/03-Polishing/LongSeqs/ && rm -rf $OutDIR/03-Polishing/binIDs && rm -rf $OutDIR/03-Polishing/flye_assembled.bins.fasta
+	else
+		echo "`datetime.ERROR` Something wrong with genome statistics of medaka-polished bins, terminating..."
+		exit 1; >&2
+	fi
+}
+
+Num_final_bins=`ls -lht $OutDIR/03-Polishing/Final-bins/*fasta 2>/dev/null | awk '$5!=0' | wc -l`
+if [[ -s $OutDIR/03-Polishing/NanoPhase.ont.genome.summary ]] && [[ $Num_final_bins == `tail -n+2 $OutDIR/03-Polishing/NanoPhase.ont.genome.summary | wc -l | awk '{print $1}'` ]]; then
+	echo "`datetime.INFO` Seems genome quality summary file has been prepared in $OutDIR/03-Polishing/NanoPhase.ont.genome.summary and
+	Final genomes could be found in $OutDIR/03-Polishing/Final-bins/
+	If you want to re-run this step, please first remove [Fina-bins and summary file] by 'rm -rf $OutDIR/03-Polishing/Fina-bins' && rm -rf $OutDIR/03-Polishing/NanoPhase.ont.genome.summary"
+else
+	if [[ -d $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins ]]; then
+		echo "`datetime.INFO` re-prepare medaka polished bins for checkm evaluation and genome classification"
+		rm -rf $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins/*
+	else
+		if [[ -d $OutDIR/03-Polishing/Final-bins/ ]]; then
+			echo "`datetime.INFO` re-prepare medaka polished bins for checkm evaluation and genome classification"
+			rm -rf $OutDIR/03-Polishing/Final-bins/*
+		else
+			echo "`datetime.TASK` prepare medaka polished bins for checkm evaluation and genome classification"
+			mkdir -p $OutDIR/03-Polishing/Final-bins/
+		fi
+		mkdir -p $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins
+	fi
+	genome_stats
+fi
+}
+
+## add short-read polishing: polypolish and polca
+sr_polypolish_polca_polishing(){
+
+ShortCluster(){
+	## for long-read-only, then hybrid
+	mkdir -p $OutDIR/03-Polishing/rename-bins
+	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
+	cat $OutDIR/03-Polishing/binIDs | while read line; do sed -e 's/^>/>'${line}_'/g' $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/${line}.fa > $OutDIR/03-Polishing/rename-bins/${line}.fa ; done
+	cat $OutDIR/03-Polishing/rename-bins/bin.*fa > $OutDIR/03-Polishing/flye_assembled.bins.fasta && rm -rf $OutDIR/03-Polishing/rename-bins
+	##
+
+	minimap2 -x sr -t $N_threads $OutDIR/03-Polishing/flye_assembled.bins.fasta $SR1_seqs $SR2_seqs > $OutDIR/03-Polishing/flye_bins-mapping.sr.paf 2>/dev/null
+	awk '!a[$1]++' $OutDIR/03-Polishing/flye_bins-mapping.sr.paf | awk '($4-$3+1)/$2 >=0.90 && $10/$11 >=0.90 {print $1"\t"$6}' > $OutDIR/03-Polishing/filtered_90_90-sr.paf
+
+	cat  $OutDIR/03-Polishing/binIDs | while read line; do echo "grep ${line}_contig $OutDIR/03-Polishing/filtered_90_90-sr.paf | awk '{print \$1}' > $OutDIR/03-Polishing/ShortSeqs/${line}-sr.IDs"; done > $OutDIR/03-Polishing/tmp.sr-extra-IDs.cmd
+	#chmod +x $OutDIR/03-Polishing/tmp.sr-extra-IDs.cmd
+	parallel -j$N_threads -k < $OutDIR/03-Polishing/tmp.sr-extra-IDs.cmd
+	
+	cat $OutDIR/03-Polishing/binIDs | while read line; do echo "seqtk subseq $SR1_seqs $OutDIR/03-Polishing/ShortSeqs/${line}-sr.IDs > $OutDIR/03-Polishing/ShortSeqs/${line}-sr_1.${sub_sr_suffix}"; done > $OutDIR/03-Polishing/tmp.seqtk-sr_1.cmd
+	cat $OutDIR/03-Polishing/binIDs | while read line; do echo "seqtk subseq $SR2_seqs $OutDIR/03-Polishing/ShortSeqs/${line}-sr.IDs > $OutDIR/03-Polishing/ShortSeqs/${line}-sr_2.${sub_sr_suffix}"; done > $OutDIR/03-Polishing/tmp.seqtk-sr_2.cmd
+	#chmod +x $OutDIR/03-Polishing/tmp.seqtk-sr_*.cmd
+
+	if [[ $N_threads -gt 15 ]]; then
+		parallel -j15 -k < $OutDIR/03-Polishing/tmp.seqtk-sr_1.cmd && parallel -j15 -k < $OutDIR/03-Polishing/tmp.seqtk-sr_2.cmd
+	else
+		parallel -j$N_threads -k < $OutDIR/03-Polishing/tmp.seqtk-sr_1.cmd && parallel -j$N_threads -k < $OutDIR/03-Polishing/tmp.seqtk-sr_2.cmd
+	fi
+
+	Fin_Num_ShortSeq1=`find $OutDIR/03-Polishing/ShortSeqs/ -name "*_1.${sub_sr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+	Fin_Num_ShortSeq2=`find $OutDIR/03-Polishing/ShortSeqs/ -name "*_2.${sub_sr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+	if [[ $Fin_Num_ShortSeq1 == `wc -l $OutDIR/03-Polishing/binIDs | awk '{print $1}'` ]] && [[ $Fin_Num_ShortSeq2 == `wc -l $OutDIR/03-Polishing/binIDs | awk '{print $1}'` ]]; then
+		echo "`datetime.DONE` ShortSeqs clustering finished sucessfully"
+		rm -rf $OutDIR/03-Polishing/*sr.paf && rm -rf $OutDIR/03-Polishing/tmp.seqtk-sr*cmd && rm -rf $OutDIR/03-Polishing/tmp.*extra-IDs.cmd
+	else
+		echo "`datetime.ERROR` Something wrong with ShortSeqs clustering, terminating..."
+		exit 1; >&2
+	fi
+}
+
+ShortCluster_check(){
+Num_ShortSeq1=`find $OutDIR/03-Polishing/ShortSeqs/ -name "*_1.${sub_sr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+Num_ShortSeq2=`find $OutDIR/03-Polishing/ShortSeqs/ -name "*_2.${sub_sr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+if [[ $Num_ShortSeq1 == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]] && [[ $Num_ShortSeq2 == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]]; then
+	echo "`datetime.INFO` Both ShortSeq1 and ShortSeq2 clusters have been generated. Now go to the next stage: polypolish polishing..."
+else
+	if [[ -d $OutDIR/03-Polishing/ShortSeqs ]]; then
+		echo "`datetime.INFO` ShortSeqs clustering re-starts"
+		rm -rf $OutDIR/03-Polishing/ShortSeqs/*
+	else
+		echo "`datetime.TASK` ShortSeqs clustering starts"
+		mkdir -p $OutDIR/03-Polishing/ShortSeqs
+	fi
+	ShortCluster
+fi
+}
+
+## polypolish polishing
+polypolish_polishing(){
+	if [[ $N_threads -gt 20 ]]; then
+		polypolish_threads=20
+		let polypolish_p=($N_threads+10)/20
+		polypolish_para=$polypolish_p
+	else
+		polypolish_threads=$N_threads
+		polypolish_para=1
+	fi
+
+	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
+
+	cat $OutDIR/03-Polishing/binIDs | while read line; do mkdir -p $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/; done
+	cat $OutDIR/03-Polishing/binIDs | while read line; do
+	echo -e "bwa index $OutDIR/03-Polishing/medaka/${line}-medaka/consensus.fasta && bwa mem -t $polypolish_threads -a $OutDIR/03-Polishing/medaka/${line}-medaka/consensus.fasta $OutDIR/03-Polishing/ShortSeqs/${line}-sr_1.${sub_sr_suffix} > $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_alignments_1.sam && bwa mem -t $polypolish_threads -a $OutDIR/03-Polishing/medaka/${line}-medaka/consensus.fasta $OutDIR/03-Polishing/ShortSeqs/${line}-sr_2.${sub_sr_suffix} > $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_alignments_2.sam && polypolish_insert_filter.py --in1 $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_alignments_1.sam --in2 $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_alignments_2.sam --out1 $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_filtered_1.sam --out2 $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_filtered_2.sam && polypolish $OutDIR/03-Polishing/medaka/${line}-medaka/consensus.fasta $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_filtered_1.sam $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_filtered_2.sam > $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}-polypolish.fasta && rm -rf $OutDIR/03-Polishing/Polypolish/${line}-Polypolish/${line}_*.sam"; done > $OutDIR/03-Polishing/tmp.sr-polypolish.cmd
+	#chmod +x $OutDIR/03-Polishing/tmp.sr-polypolish.cmd && 
+	parallel -j$polypolish_para -k < $OutDIR/03-Polishing/tmp.sr-polypolish.cmd >$OutDIR/03-Polishing/Polypolish/polypolish.polish.log 2>&1
+	rm -rf $OutDIR/03-Polishing/tmp.sr-polypolish.cmd ## clean up
+	find $OutDIR/03-Polishing/medaka/ -name consensus.fasta.* | while read line; do rm -rf $line; done
+	
+	## Check if the polypolish finished sucessfully
+	Finished_polypolish_bin=`find $OutDIR/03-Polishing/Polypolish/ -name "*-polypolish.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+	if [[ $Finished_polypolish_bin == `wc -l $OutDIR/03-Polishing/binIDs | awk '{print $1}'` ]] ; then
+		echo "`datetime.DONE` polypolish polishing finished sucessfully: detailed log file is $OutDIR/03-Polishing/Polypolish/polypolish.polish.log"
+		echo "**************************************************************************************
+		polypolish parallel: $polypolish_para; polypolish threads: $polypolish_threads"
+	else
+		echo "`datetime.ERROR` Something wrong with polypolish polishing, please also check $OutDIR/03-Polishing/Polypolish/polypolish.polish.log, terminating..."
+		exit 1; >&2
+	fi
+}
+
+polypolish_polishing_check(){
+Num_polypolish_bin=`find $OutDIR/03-Polishing/Polypolish/ -name "*-polypolish.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+if [[ $Num_polypolish_bin == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]] ; then
+	echo "`datetime.INFO` polypolish polishing has been finished. Now go to the next stage: POLCA polishing"
+else
+	if [[ -d $OutDIR/03-Polishing/Polypolish ]]; then
+		echo "`datetime.INFO` polypolish polishing re-starts"
+		rm -rf $OutDIR/03-Polishing/Polypolish/*
+	else
+		echo "`datetime.TASK` polypolish polishing starts"
+		mkdir -p $OutDIR/03-Polishing/Polypolish
+	fi
+	polypolish_polishing
+fi
+}
+
+## POLCA polishing: polishing reads must be in fastq format
+# sr_polca_polishing(){
+polca_polishing(){
+	if [[ $N_threads -gt 8 ]]; then
+		polca_threads=8
+		let polca_p=($N_threads+4)/8
+		polca_para=$polca_p
+	else
+		polca_threads=N_threads
+		polca_para=1
+	fi
+	
+	##
+	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
+	## change directory to $OutDIR/03-Polishing/POLCA
+	WorkDIR=`pwd`
+	cd "$OutDIR"/03-Polishing/POLCA
+	POLCA_PATH=`pwd`
+	Polish_Path="`dirname \"$POLCA_PATH\"`"
+
+	if [[ $sr_suffix == fa ]] || [[ $sr_suffix == fa.gz ]]; then
+		echo "`datetime.TASK` fasta to fastq reformatting starts"
+		## clean: add ow=t allow overwritting
+		## fake q value
+		cat $Polish_Path/binIDs | while read line; do 
+		echo -e "reformat.sh ow=t in=$Polish_Path/ShortSeqs/${line}-sr_1.${sub_sr_suffix} in2=$Polish_Path/ShortSeqs/${line}-sr_2.${sub_sr_suffix} out=$Polish_Path/ShortSeqs/${line}-sr_1.fq out2=$Polish_Path/ShortSeqs/${line}-sr_2.fq qfake=30"; done > $Polish_Path/POLCA/tmp.sr-fa2fq.cmd
+		#chmod +x $Polish_Path/POLCA/tmp.sr-fa2fq.cmd
+		if [[ $N_threads -gt 8 ]]; then
+			parallel -j8 -k < $Polish_Path/POLCA/tmp.sr-fa2fq.cmd >$Polish_Path/POLCA/polca.polish.log 2>&1
+		else
+			parallel -j$N_threads -k < $Polish_Path/POLCA/tmp.sr-fa2fq.cmd >$Polish_Path/POLCA/polca.polish.log 2>&1
+		fi
+		
+		fq1_file=`ls $Polish_Path/ShortSeqs/*-sr_1.fq | wc -l`
+		fq2_file=`ls $Polish_Path/ShortSeqs/*-sr_2.fq | wc -l`
+		if [[ $fq1_file == $fq2_file ]] && [[ $fq2_file == `cat $Polish_Path/binIDs | wc -l` ]]; then
+			echo "`datetime.INFO` fa2fq reformatting finished sucessfully and continue polca polishing"
+			## run polca in individual folders
+			cat $Polish_Path/binIDs | while read line; do mkdir -p $Polish_Path/POLCA/${line}-polca; done
+			cat $Polish_Path/binIDs | while read line; do
+			echo -e "cd $Polish_Path/POLCA/${line}-polca && polca.sh -a $Polish_Path/Polypolish/${line}-Polypolish/${line}-polypolish.fasta -r \"$Polish_Path/ShortSeqs/${line}-sr_1.fq $Polish_Path/ShortSeqs/${line}-sr_2.fq\" -t $polca_threads -m 2G && rm -rf $Polish_Path/POLCA/${line}-polca/${line}-polypolish.fasta.unSorted.sam && mv $Polish_Path/POLCA/${line}-polca/${line}-polypolish.fasta.PolcaCorrected.fa $Polish_Path/POLCA/${line}-polca.fasta"; done > $Polish_Path/POLCA/tmp.sr-polca.cmd
+		else
+			echo "`datetime.ERROR` Something wrong with fa2fq reformatting, terminating..."
+			exit 1
+		fi
+	elif [[ $sr_suffix == fq ]] || [[ $sr_suffix == fq.gz ]]; then
+		echo "`datetime.INFO` polca polishing starts"
+		cat $Polish_Path/binIDs | while read line; do mkdir -p $Polish_Path/POLCA/${line}-polca; done
+		cat $Polish_Path/binIDs | while read line; do
+		echo -e "cd $Polish_Path/POLCA/${line}-polca && polca.sh -a $Polish_Path/Polypolish/${line}-Polypolish/${line}-polypolish.fasta -r \"$Polish_Path/ShortSeqs/${line}-sr_1.${sub_sr_suffix} $Polish_Path/ShortSeqs/${line}-sr_2.${sub_sr_suffix}\" -t $polca_threads -m 2G && rm -rf $Polish_Path/POLCA/${line}-polca/${line}-polypolish.fasta.unSorted.sam && mv $Polish_Path/POLCA/${line}-polca/${line}-polypolish.fasta.PolcaCorrected.fa $Polish_Path/POLCA/${line}-polca.fasta"; done > $Polish_Path/POLCA/tmp.sr-polca.cmd
+	fi
+
+	## 
+
+	#chmod +x $Polish_Path/POLCA/tmp.sr-polca.cmd && 
+	parallel -j$polca_para -k < $Polish_Path/POLCA/tmp.sr-polca.cmd >>$Polish_Path/POLCA/polca.polish.log 2>&1
+	mkdir -p $Polish_Path/POLCA/POLCA-bins/ 
+	
+	## check if all bins have been polished sucessfully
+	ls $Polish_Path/POLCA/*-polca.fasta 2>/dev/null | awk -F"/" '{print $NF}' | cut -d- -f1 | sort -t. -k2n > $Polish_Path/tmp.polca.sucessful.binID
+	
+	########
+	if [[ `wc -l $Polish_Path/tmp.polca.sucessful.binID | awk '{print $1}'` == `wc -l $Polish_Path/binIDs | awk '{print $1}'` ]]; then
+		#echo "`datetime.DONE` All bins have been polished sucessfully by POLCA"
+		cat $Polish_Path/binIDs | while read line; do 
+			mv $Polish_Path/POLCA/${line}-polca.fasta $Polish_Path/POLCA/POLCA-bins/; done
+	else
+		echo -e "`datetime.INFO` Not all bins were polished sucessfully by POLCA polishing
+		Bins: [`comm -13 <(sort $Polish_Path/tmp.polca.sucessful.binID) <(sort $Polish_Path/binIDs) | sort -t. -k2n | tr '\n' '\t' | sed -e 's/\t$//g'`] did not work, it should have little effect, so using polypolish-polished bins instead"
+		
+		comm -13 <(sort $Polish_Path/tmp.polca.sucessful.binID) <(sort $Polish_Path/binIDs) | while read line; do
+			cp $Polish_Path/Polypolish/${line}-Polypolish/${line}-polypolish.fasta $Polish_Path/POLCA/POLCA-bins/${line}-polca.fasta; done
+		cat $Polish_Path/tmp.polca.sucessful.binID | while read line; do
+			mv $Polish_Path/POLCA/${line}-polca.fasta $Polish_Path/POLCA/POLCA-bins/; done
+	fi
+
+	## clean-up files
+	ls $Polish_Path/POLCA/ | grep -v 'POLCA-bins\|polca.polish.log' | while read line; do rm -rf $line; done
+	find $Polish_Path/Polypolish/ -name *fai | while read line; do rm -rf $line; done
+	rm -rf $Polish_Path/tmp.polca.sucessful.binID
+	cd $WorkDIR
+
+	Fin_Num_polca_bin=`find $OutDIR/03-Polishing/POLCA/POLCA-bins/ -name "*-polca.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+	if [[ $Fin_Num_polca_bin == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]] ; then
+		echo "`datetime.DONE` polca polishing finished sucessfully: detailed log file is $Polish_Path/POLCA/polca.polish.log"
+		#rm -rf $Polish_Path/ShortSeqs/*-sr_1.fq && rm -rf $Polish_Path/ShortSeqs/*-sr_2.fq
+		echo "**************************************************************************************
+		polca parallel: $polca_para; polca_threads: $polca_threads"
+	else
+		echo "`datetime.ERROR` Something wrong with POLCA polishing, please also check $Polish_Path/POLCA/polca.polish.log, terminating..."
+		exit 1; >&2
+	fi
+}
+
+polca_polishing_check(){
+Num_polca_bin=`find $OutDIR/03-Polishing/POLCA/POLCA-bins/ -name "*-polca.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+if [[ $Num_polca_bin == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]] ; then
+	echo "`datetime.INFO` polca polishing has been finished. Now go to the next stage: bin quality assessement and genome classification"
+else
+	if [[ -d $OutDIR/03-Polishing/POLCA ]]; then
+		echo "`datetime.INFO` polca polishing re-starts"
+		rm -rf $OutDIR/03-Polishing/POLCA/*
+	else
+		echo "`datetime.INFO` polca polishing starts"
+		mkdir -p $OutDIR/03-Polishing/POLCA
+	fi
+	polca_polishing
+fi
+}
+
+Num_ShortSeq1=`find $OutDIR/03-Polishing/ShortSeqs/ -name "*_1.${sub_sr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+Num_ShortSeq2=`find $OutDIR/03-Polishing/ShortSeqs/ -name "*_2.${sub_sr_suffix}" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+Num_polypolish_bin=`find $OutDIR/03-Polishing/Polypolish/ -name "*-polypolish.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+Num_polca_bin=`find $OutDIR/03-Polishing/POLCA/POLCA-bins/ -name "*-polca.fasta" -exec ls -lht {} \; 2>/dev/null | awk '$5!=0' | awk '{print $9}' | wc -l`
+
+if [[ $Num_polca_bin == $Num_polypolish_bin ]] && [[ $Num_polca_bin == `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` ]]; then
+        polca_polishing_check
+else
+        ShortCluster_check && polypolish_polishing_check && polca_polishing_check && echo
+fi
+}
+
+## polca polished bin genome stats
+hybrid_genome_stats(){
+genome_stats(){
+	##
+	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
+	##
+	cat $OutDIR/03-Polishing/binIDs | while read line; do cp $OutDIR/03-Polishing/POLCA/POLCA-bins/${line}-polca.fasta $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.polca.fasta; done
+	## checkm evaluation
+	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]] && [[ `wc -l $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness | awk '{print $1}'` == `cat $OutDIR/03-Polishing/binIDs | wc -l` ]]; then
+		echo "`datetime.INFO` genome quality assessment has been finished. Now, go to the next stage: genome classification"
+	else
+		echo "`datetime.TASK` genome quality assessment starts"
+		checkm lineage_wf -x fasta -t $N_threads $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/ $OutDIR/03-Polishing/Final-bins/checkm-output >$OutDIR/03-Polishing/Final-bins/checkm.log 2>/dev/null
+		echo "`cat $OutDIR/03-Polishing/Final-bins/checkm.log`"
+		
+		##
+		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '! /^-------------------/' > $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness
+		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10' > $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness
+
+		if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]] && [[ `wc -l $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness | awk '{print $1}'` == `cat $OutDIR/03-Polishing/binIDs | wc -l` ]]; then
+			echo "`datetime.DONE` genome quality assessment finished sucessfully. Now, go to the next stage: genome classification"
+		else
+			echo "`datetime.ERROR` Something wrong with checkm process, terminating..."
+			exit 1; >&2
+		fi
+	fi
+
+	## check BBMap
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do stats.sh $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.fasta format=6 | grep -v "#" | awk '{print $3"\t"$1"\t"$9"\t"$18}'; done > $OutDIR/03-Polishing/Final-bins/tmp.genome-stats
+
+	if [[ ! -s $OutDIR/03-Polishing/Final-bins/tmp.genome-stats ]]; then
+		echo "`datetime.ERROR` Something wrong with BBMap::stats.sh, terminating..."
+		exit 1; >&2
+	fi
+
+	## filtering genome quality based on completeness (>=50%) and contamination (<=10%): should add command option in the next version update.
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do mv $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.fasta $OutDIR/03-Polishing/Final-bins/ ; done
+
+	## Taxa info
+	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]] && [[ `cat $OutDIR/03-Polishing/Final-bins/tmp.taxa | wc -l` == `ls $OutDIR/03-Polishing/Final-bins/*fasta | wc -l` ]]; then
+		echo "`datetime.INFO` GTDB::Taxa has been finished sucessfully"
+	else
+		echo "`datetime.TASK` Genome taxa classification starts"
+		gtdbtk classify_wf --genome_dir $OutDIR/03-Polishing/Final-bins/ -x fasta --out_dir $OutDIR/03-Polishing/Final-bins/tmp --cpus $N_threads >/dev/null 2>&1
+		echo "`cat $OutDIR/03-Polishing/Final-bins/tmp/gtdbtk.log`"
+		echo "`datetime.DONE` genome classification done"
+
+		cat $OutDIR/03-Polishing/Final-bins/tmp/classify/gtdbtk.*summary.tsv | grep -v '^user_genome' | awk '{print $1"\t"$2}' > $OutDIR/03-Polishing/Final-bins/tmp.taxa
+
+		if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]] && [[ `cat $OutDIR/03-Polishing/Final-bins/tmp.taxa | wc -l` == `ls $OutDIR/03-Polishing/Final-bins/*fasta | wc -l` ]]; then
+ 			echo "`datetime.DONE` GTDB::Taxa finished sucessfully"
+		else
+			echo "`datetime.ERROR` Something wrong with GTDB::Taxa process, terminating..."
+			exit 1; >&2
+		fi
+	fi
+
+	## data combination
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
+
+	paste $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness $OutDIR/03-Polishing/Final-bins/tmp.genome-stats $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted | sort -t. -k2n | sed -e 's/.polca//g' > $OutDIR/03-Polishing/tmp.NanoPhase.genome.summary
+	
+	cat $OutDIR/03-Polishing/tmp.NanoPhase.genome.summary | awk '{print $1"\t"$6}' | while read binID N_Contig; do
+	## Add circular Info from flye assemblies
+	if [[ $N_Contig == 1 ]]; then
+		grep "^>" $OutDIR/03-Polishing/Final-bins/${binID}.polca.fasta | cut -d_ -f2-3 | while read ContigID; do grep -w $ContigID $OutDIR/01-LongAssemblies/assembly_info.txt ; done | awk '{print $4}' | while read CirInfo; do
+		if [[ $CirInfo == Y ]]; then 
+			echo "Y"
+		else
+			echo "N"
+		fi; done
+	else
+		echo "N"
+	fi; done | paste $OutDIR/03-Polishing/tmp.NanoPhase.genome.summary - | awk -F"\t" -v OFS="\t" '{temp = $9; $9 = $10; $10 = temp; print $0}' | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tIfCir.\tGTDB-Taxa' > $OutDIR/03-Polishing/NanoPhase.hybrid.genome.summary
+	
+	# clean up and rename
+	rm -rf $OutDIR/03-Polishing/Final-bins/tmp* && rm -rf $OutDIR/03-Polishing/Final-bins/checkm* && rm -rf $OutDIR/03-Polishing/tmp.NanoPhase.genome.summary 
+	# rename files and contig names
+	#rename 's/\.polca//' $OutDIR/03-Polishing/Final-bins/*fasta
+	ls $OutDIR/03-Polishing/Final-bins/*polca.fasta | sed -e "s/.polca.fasta//g" | while read line; do mv ${line}.polca.fasta ${line}.fasta; done
+	ls $OutDIR/03-Polishing/Final-bins/*fasta | while read line; do sed -i 's/_polypolish//g' $line; done
+	
+	Fin_Num_final_bins=`ls -lht $OutDIR/03-Polishing/Final-bins/*fasta 2>/dev/null | awk '$5!=0' | wc -l`
+	if [[ -s $OutDIR/03-Polishing/NanoPhase.hybrid.genome.summary ]] && [[ $Fin_Num_final_bins == `tail -n+2 $OutDIR/03-Polishing/NanoPhase.hybrid.genome.summary | wc -l | awk '{print $1}'` ]]; then
+		echo "`datetime.DONE` Genome statistics finished sucessfully
+		Final bins could be found in $OutDIR/03-Polishing/Final-bins/ and
+		bin summary file is $OutDIR/03-Polishing/NanoPhase.hybrid.genome.summary"
+		## clean up ShortSeqs and LongSeqs
+		rm -rf $OutDIR/03-Polishing/ShortSeqs/ && rm -rf $OutDIR/03-Polishing/LongSeqs/ && rm -rf $OutDIR/03-Polishing/binIDs && rm -rf $OutDIR/03-Polishing/flye_assembled.bins.fasta
+	else
+		echo "`datetime.ERROR` Something wrong with genome statistics of polca-polished bins, terminating..."
+		exit 1; >&2
+	fi
+}
+
+
+Num_final_bins=`ls -lht $OutDIR/03-Polishing/Final-bins/*fasta 2>/dev/null | awk '$5!=0' | wc -l`
+if [[ -s $OutDIR/03-Polishing/NanoPhase.hybrid.genome.summary ]] && [[ $Num_final_bins == `tail -n+2 $OutDIR/03-Polishing/NanoPhase.hybrid.genome.summary | wc -l | awk '{print $1}'` ]]; then
+	echo "`datetime.INFO` Seems genome quality summary file has been prepared in $OutDIR/03-Polishing/NanoPhase.hybrid.genome.summary and
+	Final genomes could be found in $OutDIR/03-Polishing/Final-bins/
+	If you want to re-run this step, please first remove [Fina-bins && summary file] by 'rm -rf $OutDIR/03-Polishing/Fina-bins' && 'rm -rf $OutDIR/03-Polishing/NanoPhase.hybrid.genome.summary'"
+else
+	if [[ -d $OutDIR/03-Polishing/Final-bins/tmp-polca-bins ]]; then
+		echo "`datetime.INFO` re-prepare polca polished bins for checkm evaluation and genome classification"
+		rm -rf $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/*
+	else
+		if [[ -d $OutDIR/03-Polishing/Final-bins/ ]]; then
+			echo "`datetime.INFO` re-prepare polca polished bins for checkm evaluation and genome classification"
+			rm -rf $OutDIR/03-Polishing/Final-bins/*
+		else
+			echo "`datetime.TASK` prepare polca polished bins for checkm evaluation and genome classification"
+			mkdir -p $OutDIR/03-Polishing/Final-bins/
+		fi
+		mkdir -p $OutDIR/03-Polishing/Final-bins/tmp-polca-bins
+	fi
+	genome_stats
+fi
+}
+
+## add 16S function in the next update
+
+#######################
+if [[ $Type = long_read_only ]]; then
+        echo "`datetime.INFO` long_read_only model was selected, only Nanopore long reads will be used"
+        if [[ -f $SR1_seqs ]] || [[ -f $SR2_seqs ]]; then
+                echo "`datetime.ERROR` It seems you are using long_read_only model, but provided short reads at the same time. If short reads were involved, please use [--hybrid] parameter, or remove short reads in the command; terminating..."
+                show_help; exit 1; fi
+        long_read_check
+        ## long-read-only model
+        package_check && long_read_only_strategy && long_read_only_genome_stats && echo
+elif [[ $Type = hybrid ]]; then
+        echo "`datetime.INFO` hybrid model was selected, both long and short reads will be used"
+        long_read_check && short_read_check
+        ## full-stage hybrid strategy
+        package_check && long_read_only_strategy && sr_polypolish_polca_polishing && hybrid_genome_stats && echo
+fi
+
+echo -e "`datetime.DONE` NanoPhase finished and have a nice day!\n"
+##########################
+

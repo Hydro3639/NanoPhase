@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+### nanophase master script 
+set -eo pipefail
+
+##
+VERSION="0.2.0"
+
+###### Usage ######
+show_help(){
+cat << EOF
+
+`echo "nanophase v=$VERSION"`
+
+Main modules
+	check			check if all packages have been installed
+	meta                    genome assembly, binning, quality assessment and classification for metagenomic datasets
+	isolate			genome assembly, binning, quality assessment and classification for bacterial isolates
+
+Test modules
+	args			Antibiotic Resistance Genes (ARGs) identification from reconstructed MAGs
+
+Other options
+	-h | --help		show the help message
+	-v | --version		show nanophase version
+
+example usage:
+        nanophase check 											## package availability checking
+        nanophase meta -l ont.fastq.gz -t 16 -o nanophase-out							## meta::long reads only
+        nanophase meta -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o nanophase-out	## meta::hybrid strategy
+	nanophase isolate -l ont.fastq.gz -t 16 -o nanophase-out 						## isolate::long reads only
+	nanophase isolate -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o nanophase-out 	## isolate::hybrid strategy
+	nanophase args -i Final-bins -x fasta -o nanophase.ARGs.summary.txt					## ARGs identification
+
+EOF
+}
+
+### 
+base_dir=$(cd `dirname $0`; pwd)
+#base_path=`realpath $0`
+#base_dir=`dirname $base_path`
+
+if [[ "$1" == check ]]; then
+	$base_dir/nanophase.check
+elif [[ "$1" == isolate ]]; then
+	#echo nanophase isolate ${@:2}
+	$base_dir/nanophase.iso ${@:2}
+elif [[ "$1" == meta ]]; then
+	#echo nanophase meta ${@:2}
+	$base_dir/nanophase.meta ${@:2}
+elif [[ "$1" == args ]]; then
+	$base_dir/nanophase.args ${@:2}
+elif [[ "$1" = "-h" ]] || [[ "$1" = "--help" ]]; then
+	show_help
+elif [[ "$1" = "-v" ]] || [[ "$1" = "--version" ]]; then
+	echo "nanophase v=$VERSION"
+elif [[ "$1" = "" ]]; then
+	show_help
+else
+	echo "Error: please check the input nanophase module; now show nanophase -h"
+	show_help
+	exit 1
+fi
+
+
+

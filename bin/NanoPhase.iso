@@ -21,8 +21,8 @@ arguments:
 	-v, --version           show version number and exit
 
 example usage:
-        NanoPhase isolate -l ont.fastq -t 16 -o NanoPhase-out 						## long reads only
-        NanoPhase isolate -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out 	## hybrid strategy
+        NanoPhase isolate -l ont.fastq.gz -t 16 -o NanoPhase-out 						## long reads only
+        NanoPhase isolate -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o NanoPhase-out 	## hybrid strategy
 
 EOF
 }
@@ -42,8 +42,9 @@ medaka_model="r941_min_hac_g507"
 VERSION="0.2.0"
 
 ## call command to tmp_cmd
-echo "`datetime.INFO` NanoPhase (isolate) starts"
 tmp_cmd=`echo -e "\nCommand line: $CRTDIR/NanoPhase isolate $*"`
+
+
 ##
 params="$(getopt -o hl:1:2:t:o:m:v --long help,hybrid,long:,long-read-only,threads:,medaka_model:,out:,version -- "$@")"
 if [[ $? -gt 0 ]]; then show_help; exit 1; fi
@@ -75,9 +76,11 @@ datetime.WARNING(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] WARNING:; }
 datetime.ERROR(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] ERROR:; }
 datetime.DONE(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] DONE:; }
 
-###
-echo -e "`datetime.INFO` NanoPhase starts"
+### NanoPhase starts
+echo "`datetime.INFO` NanoPhase (isolate) starts"
 echo `datetime.INFO` $tmp_cmd
+##
+
 
 long_read_check(){
 if [[ ! -f "$ONT_seqs" ]]; then 
@@ -168,7 +171,7 @@ else
 fi
 
 if [[ ! -s $OutDIR/.package.not.installed ]]; then
-        echo "`datetime.INFO` All required packages have been found in the environment"
+        echo "`datetime.INFO` All required packages have been found in the environment. If the above certain packages integrated into NanoPhase were used in your investigation, please give them credit as well :)"
         path_check=`cat  $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | awk '!a[$1]++' | wc -l`
         if [[ $path_check -gt 1 ]]; then
                 echo "`datetime.WARNING` [`cat  $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | grep -v 'NanoPhase\/bin' | while read line; do grep -w $line $OutDIR/.package.installed; done | awk '!a[$1]++ {print $1}' | tr '\n' ' ' | sed -e 's/ $//g'`] has not been installed in the [NanoPhase] env. Strongly recommend installing all packages in the NanoPhase env, or it may result in a failure"

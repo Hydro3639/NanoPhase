@@ -27,8 +27,8 @@ output sub-folders:
         03-Polishing            sub-folder containing polished bins
 
 example usage:
-        NanoPhase meta -l ont.fastq -t 16 -o NanoPhase-out 						## long reads only
-        NanoPhase meta -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out 	## hybrid strategy
+        NanoPhase meta -l ont.fastq.gz -t 16 -o NanoPhase-out 							## long reads only
+        NanoPhase meta -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o NanoPhase-out 	## hybrid strategy
 
 EOF
 }
@@ -182,7 +182,7 @@ else
 fi
 
 if [[ ! -s $OutDIR/.package.not.installed ]]; then
-	echo "All required packages have been found in the environment"
+	echo "All required packages have been found in the environment. If the above certain packages integrated into NanoPhase were used in your investigation, please give them credit as well :)"
 	path_check=`cat  $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | awk '!a[$1]++' | wc -l`
 	if [[ $path_check -gt 1 ]]; then
 		echo "Warning: [`cat  $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | grep -v 'NanoPhase\/bin' | while read line; do grep -w $line $OutDIR/.package.installed; done | awk '!a[$1]++ {print $1}' | tr '\n' ' ' | sed -e 's/ $//g'`] has not been installed in the [NanoPhase] env. Strongly recommend installing all packages in the NanoPhase env, or it may result in a failure"

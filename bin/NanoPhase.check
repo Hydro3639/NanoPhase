@@ -3,7 +3,7 @@
 set -eo pipefail
 
 
-	echo "Check software availability and locations"
+	echo -e "\nCheck software availability and locations"
         rm -rf .package.installed 2>/dev/null && rm -rf .package.not.installed 2>/dev/null
 
         echo -e "flye\nmetabat2\nrun_MaxBin.pl\nmetawrap\ncheckm\nracon\nmedaka\npolypolish\npolca.sh\nbwa\nseqtk\nminimap2\nstats.sh\nparallel\nperl\nsamtools\ngtdbtk\nfastANI\nblastp" | while read package; do
@@ -22,7 +22,7 @@ set -eo pipefail
         fi
 
         if [[ ! -s .package.not.installed ]]; then
-                echo "All required packages have been found in the environment"
+                echo "All required packages have been found in the environment. If the above certain packages integrated into NanoPhase were used in your investigation, please give them credit as well :)"
                 path_check=`cat .package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | awk '!a[$1]++' | wc -l`
                 if [[ $path_check -gt 1 ]]; then
                         echo "Warning: [`cat .package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | grep -v 'NanoPhase\/bin' | while read line; do grep -w $line .package.installed; done | awk '!a[$1]++ {print $1}' | tr '\n' ' ' | sed -e 's/ $//g'`] has not been installed in the [NanoPhase] env. Strongly recommend intalling all packages in the NanoPhase env, or it may result in a failure"

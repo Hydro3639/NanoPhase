@@ -24,12 +24,12 @@ Other options
 	-v | --version		show NanoPhase version
 
 example usage:
-        NanoPhase check 										## package availability checking
-        NanoPhase meta -l ont.fastq -t 16 -o NanoPhase-out						## meta::long reads only
-        NanoPhase meta -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out		## meta::hybrid strategy
-	NanoPhase isolate -l ont.fastq -t 16 -o NanoPhase-out 						## isolate::long reads only
-	NanoPhase isolate -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out 	## isolate::hybrid strategy
-	NanoPhase args -i Final-bins -x fasta -o NanoPhase.ARGs.summary.txt				## ARGs identification
+        NanoPhase check 											## package availability checking
+        NanoPhase meta -l ont.fastq.gz -t 16 -o NanoPhase-out							## meta::long reads only
+        NanoPhase meta -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o NanoPhase-out	## meta::hybrid strategy
+	NanoPhase isolate -l ont.fastq.gz -t 16 -o NanoPhase-out 						## isolate::long reads only
+	NanoPhase isolate -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o NanoPhase-out 	## isolate::hybrid strategy
+	NanoPhase args -i Final-bins -x fasta -o NanoPhase.ARGs.summary.txt					## ARGs identification
 
 EOF
 }

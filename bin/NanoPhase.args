@@ -17,6 +17,7 @@ arguments:
 	-t, --threads           number of threads [default: 16]
         -h, --help              print help information and exit
         -v, --version           show version number and exit
+	--download		download or update SARG database
 
 example usage:
         NanoPhase args -i Final-bins -x fasta -o NanoPhase.ARGs.summary.txt	## ARGs identification
@@ -87,7 +88,7 @@ else
 fi ; done
 
 if [[ -s .package.installed ]]; then
-        echo "`datetime.INFO` The following packages have been found"
+        echo "`datetime.INFO` The following packages have been found. If the above certain packages integrated into NanoPhase were used in your investigation, please give them credit as well :)"
         cat .package.installed | sed -e '1i#package\tlocation' | awk '{printf "%-20s %s\n", $1,$2}'
 else
         echo "`datetime.ERROR` No required package has been found in the environment, please install, terminating..."

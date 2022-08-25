@@ -5,7 +5,7 @@
 [![Anaconda-Server Badge](https://anaconda.org/nanophase/nanophase/badges/installer/conda.svg)](https://conda.anaconda.org/nanophase)
 
 
-NanoPhase is an easy-to-use pipeline to generate reference-quality MAGs using only Nanopore long reads (long-read-only strategy) or both Nanopore long and Illumina short reads (hybrid strategy) from complex metagenomes. Since NanoPhase v2.0, it also supports to generate reference-quality genomes from bacterial/archaeal isolates (long-read-only or hybrid strategy). If NanoPhase is interrupted, it will resume from the last completed stage.
+NanoPhase is an easy-to-use pipeline to generate reference-quality MAGs using only Nanopore long reads (long-read-only strategy) or both Nanopore long and Illumina short reads (hybrid strategy) from complex metagenomes. Since NanoPhase v0.2.0, it also supports to generate reference-quality genomes from bacterial/archaeal isolates (long-read-only or hybrid strategy). If NanoPhase is interrupted, it will resume from the last completed stage.
 
 ## Installation instructions
 It is advised to first install [conda](https://docs.conda.io/en/latest/miniconda.html) (`miniconda3` is suggested), then add required channels and install [mamba](https://github.com/mamba-org/mamba) following the instruction below:

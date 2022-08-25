@@ -1,12 +1,15 @@
 ### NanoPhase dependancies
 ##### If you are using NanoPhase, Please also give them credit
+  * [ARGs-OAP::database](https://github.com/xinehc/args_oap)
   * [BBMap](https://sourceforge.net/projects/bbmap/files/)
   * [bcftools](https://samtools.github.io/bcftools/)
   * [bgzip](https://github.com/samtools/tabix)
+  * [blast+](https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=Download)
   * [bwa](https://github.com/lh3/bwa)
   * [checkm](https://github.com/Ecogenomics/CheckM)                                                                                 
   * [flye/metaflye](https://github.com/fenderglass/Flye)
   * [freebayes](https://github.com/freebayes/freebayes)
+  * [gtdbtk](https://github.com/Ecogenomics/GTDBTk)
   * [HMMER](http://hmmer.org/)
   * [medaka](https://github.com/nanoporetech/medaka)
   * [metabat2](https://bitbucket.org/berkeleylab/metabat/src/master/)
@@ -23,3 +26,4 @@
   * [samtools](https://github.com/samtools/samtools)
   * [seqtk](https://github.com/lh3/seqtk)
   * [tabix](https://github.com/samtools/tabix)
+

@@ -118,8 +118,8 @@ output sub-folders:
         03-Polishing            sub-folder containing polished bins
 
 example usage:
-        NanoPhase meta -l ont.fastq.gz -t 16 -o NanoPhase-out                                              ## long reads only
-        NanoPhase meta -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o NanoPhase-out         ## hybrid strategy
+        NanoPhase meta -l ont.fastq.gz -t 16 -o NanoPhase-out                                                 ## long reads only
+        NanoPhase meta -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o NanoPhase-out      ## hybrid strategy
 
 ```
 

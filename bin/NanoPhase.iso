@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-## NanoPhase (isolate) is designed for generating high-quality genomes for bacterial isolates using Nanopore sequencing data (or hybrid strategy: Nanopore+Illumina)
+## NanoPhase (isolate) is designed for generating high-quality genomes for bacterial isolates using only Nanopore sequencing data (or hybrid strategy: Nanopore + Illumina)
 set -eo pipefail
 
 

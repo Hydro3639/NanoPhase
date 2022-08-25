@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-## NanoPhase (meta) is designed for generating metagenome-assembled genomes (MAGs) from Nanopore metagenomic sequencing data or hybrid strategy
+## NanoPhase (meta) is designed for generating metagenome-assembled genomes (MAGs) from Nanopore metagenomic sequencing data using only Nanopore long reads (or hybrid strategy: Nanopore + Illumina)
 set -eo pipefail
 
 

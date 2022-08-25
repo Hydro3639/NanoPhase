@@ -16,6 +16,9 @@ Main modules
 	meta                    genome assembly, binning, quality assessment and classification for metagenomic datasets
 	isolate			genome assembly, binning, quality assessment and classification for bacterial isolates
 
+Test modules
+	args			Antibiotic Resistance Genes (ARGs) identification from reconstructed MAGs
+
 Other options
 	-h | --help		show the help message
 	-v | --version		show NanoPhase version
@@ -26,6 +29,7 @@ example usage:
         NanoPhase meta -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out		## meta::hybrid strategy
 	NanoPhase isolate -l ont.fastq -t 16 -o NanoPhase-out 						## isolate::long reads only
 	NanoPhase isolate -l ont.fastq --hybrid -1 sr_1.fastq -2 sr_2.fastq -t 16 -o NanoPhase-out 	## isolate::hybrid strategy
+	NanoPhase args -i Final-bins -x fasta -o NanoPhase.ARGs.summary.txt				## ARGs identification
 
 EOF
 }

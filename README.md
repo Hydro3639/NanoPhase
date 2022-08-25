@@ -31,7 +31,7 @@ source NanoPhase/bin/Install.sh
 ## [GTDB database](https://gtdb.ecogenomic.org/downloads) download
 Please note that GTDB database will not download automatically via the above installation, so the user can specify a friendly storage location because it takes a lot of storage space ([~66G](https://ecogenomics.github.io/GTDBTk/installing/index.html#installing-third-party-software:~:text=GTDB%2DTk%20requires%20~66G%20of%20external%20data%20that%20needs%20to%20be%20downloaded%20and%20unarchived%3A)). Or if you have downloaded this database before, you may skip this first download step.
 ```
-wget https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_v2_data.tar.gz && tar xvzf gtdbtk_v2_data.tar.gz ## May skip if you have done before
+wget https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_v2_data.tar.gz && tar xvzf gtdbtk_v2_data.tar.gz ## May skip if you have done before or GTDB database has been downloaded in the server
 conda activate NanoPhase
 echo "export GTDBTK_DATA_PATH=/path/to/release/package/" > $(dirname $(dirname `which NanoPhase`))/etc/conda/activate.d/gtdbtk.sh ## Change /path/to/release/package/ to the real location where you storaged the GTDB database
 ```

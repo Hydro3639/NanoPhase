@@ -311,7 +311,7 @@ genome_stats(){
 	echo "`cat $OutDIR/03-Polishing/Final-bins/tmp/gtdbtk.log`"
 	echo "`datetime.DONE` genome classification done"
 	
-	cat $OutDIR/03-Polishing/Final-bins/tmp/classify/gtdbtk.*summary.tsv | grep -v '^user_genome' | awk '{print $2}' > $OutDIR/03-Polishing/Final-bins/tmp.taxa
+	cat $OutDIR/03-Polishing/Final-bins/tmp/classify/gtdbtk.*summary.tsv | grep -v '^user_genome' | awk -F"\t" '{print $2}' > $OutDIR/03-Polishing/Final-bins/tmp.taxa
 	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]]; then
 		echo "`datetime.DONE` GTDB::Taxa finished sucessfully"
 	else

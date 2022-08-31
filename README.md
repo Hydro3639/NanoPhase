@@ -34,6 +34,7 @@ Please note that GTDB database will not download automatically via the above ins
 wget https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_v2_data.tar.gz && tar xvzf gtdbtk_v2_data.tar.gz ## May skip if you have done before or GTDB database has been downloaded in the server
 conda activate nanophase
 echo "export GTDBTK_DATA_PATH=/path/to/release/package/" > $(dirname $(dirname `which nanophase`))/etc/conda/activate.d/gtdbtk.sh ## Change /path/to/release/package/ to the real location where you storaged the GTDB database
+conda deactivate && conda activate nanophase ## require re-activate nanophase
 ```
 ## Usage
 Please look at [nanophase usage tutorial](https://github.com/Hydro3639/nanophase/blob/main/Usage_tutorial.md) to verify the nanophase installation via an [example dataset](https://github.com/example-data/np-example).

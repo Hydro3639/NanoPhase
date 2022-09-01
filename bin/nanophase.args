@@ -29,7 +29,7 @@ EOF
 ## default parameters
 OPTIND=1 # Reset in case getopts has been used previously in the shell
 
-VERSION="0.2.0"
+VERSION="0.2.1"
 bin_suffix=fasta
 N_threads="16"
 #input_folder="Final-bins/"

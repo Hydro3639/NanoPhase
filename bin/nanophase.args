@@ -200,7 +200,7 @@ echo "`datetime.INFO` Blast to SARG database for ARGs identification (be patient
 ls $rp_input_folder/tmp-ARGs/*faa | awk -F"/" '{print $NF}' | xargs -P $N_threads_arg -I {} blastp -query $rp_input_folder/tmp-ARGs/{} -evalue 1e-5 -max_target_seqs 5 -num_threads $blastp_threads -db $base_dir/SARG.fasta -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs" -out $rp_input_folder/tmp-ARGs/{}.tmp.blast6.out
 
 echo "`datetime.INFO` Summarize the result"
-cat $rp_input_folder/tmp-ARGs/*.tmp.blast6.out | awk '!a[$1]++' | awk '$3>="'$similarity'" && $NF>="'$coverage'" {print $1"\t"$3"\t"$2}' | while read line1 line2 line3; do paste <(echo -e $line1"\t"$line2) <(grep $line3 $base_dir/*-component_structure.txt); done | sed -e 's/two-component system//g' -e 's/multicomponent system//g' -e 's/_structure.txt:/ system/g' | cat <(paste <(echo -e "BinID_ContigID_OrfID\tsimilarity") <(head -1 $base_dir/single-component_structure.txt)) - | awk -F"\t" -v OFS="\t" '{$3=""; $4=""; $(NF-2)=""; $(NF-1)=""; $NF=""; print $0}' | sed -e 's/\t\t\t/\t/g' >$output_file
+cat $rp_input_folder/tmp-ARGs/*.tmp.blast6.out | awk '!a[$1]++' | awk '$3>="'$similarity'" && $NF>="'$coverage'" {print $1"\t"$3"\t"$2}' | while read line1 line2 line3; do paste <(echo -e $line1"\t"$line2) <(grep $line3 $base_dir/*-component_structure.txt | cut -d: -f2-100); done | cat <(paste <(echo -e "BinID_ContigID_OrfID\tSimilarity") <(head -1 $base_dir/single-component_structure.txt)) - | awk -F"\t" -v OFS="\t" '{print $0}' >$output_file
 
 if [[ `tail -n+2 $output_file | wc -l` -gt 1 ]]; then
 	echo "`datetime.DONE` ARGs identifiation from MAGs finished"

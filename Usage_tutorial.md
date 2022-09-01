@@ -3,6 +3,10 @@
 ```
 wget https://github.com/example-data/np-example/raw/main/np.test.tar && tar -xvf np.test.tar && rm -rf np.test.tar ## download the example data
 ```
+Or it waits too long, you may using the following link as well
+```
+wget -O np.test.tar https://www.dropbox.com/s/ey9hfntqn789gz0/np.test.tar?dl=0 && tar -xvf np.test.tar && rm -rf np.test.tar 
+```
 
 ### Using only Nanopore long reads to reconstruct reference-quality MAGs
 ```

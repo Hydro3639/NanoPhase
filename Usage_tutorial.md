@@ -162,7 +162,7 @@ cat hybrid-nanophase-out/03-Polishing/nanophase.hybrid.genome.summary
 bin.1   100.00  0.00    0.00    2028324 1       2028324 0.59294 Y       d__Bacteria;p__Actinobacteriota;c__Actinomycetia;o__Actinomycetales;f__Bifidobacteriaceae;g__Bifidobacterium;s__Bifidobacterium
 bin.2   99.00   0.55    100.00  1889441 2       1827513 0.52311 N       d__Bacteria;p__Firmicutes;c__Bacilli;o__Lactobacillales;f__Lactobacillaceae;g__Limosilactobacillus;s__Limosilactobacillus
 ```
-### Antobiotic Resistance Genes (ARGs) identication from the above reconstructed MAGs
+### Antobiotic Resistance Genes (ARGs) identification from the above reconstructed MAGs
 `nanophase args` module still is in the active development stage at this time being. We hope to provide more versatile functions in the next release.
 Please note that [SARG database](https://github.com/xinehc/args_oap/tree/main/args_oap/DB) is under revision, the output results were generated using `nanophase v=0.2.0`
 ```

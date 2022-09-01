@@ -45,7 +45,7 @@ CRTDIR=$(cd `dirname $0`; pwd)
 OutDIR="nanophase-out"
 check_pkg="false"
 medaka_model="r941_min_hac_g507"
-VERSION="0.2.0"
+VERSION="0.2.1"
 
 ## call command to tmp_cmd
 tmp_cmd=`echo -e "\nCommand line: $CRTDIR/nanophase meta $*"`

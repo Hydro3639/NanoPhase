@@ -28,12 +28,16 @@ git clone https://github.com/Hydro3639/NanoPhase.git
 source NanoPhase/bin/Install.sh
 ## this command will create nanophase env and install all necessary packages
 ```
-## [GTDB database](https://gtdb.ecogenomic.org/downloads) download
-Please note that GTDB database will not download automatically via the above installation, so the user can specify a friendly storage location because it takes a lot of storage space ([~66G](https://ecogenomics.github.io/GTDBTk/installing/index.html#installing-third-party-software:~:text=GTDB%2DTk%20requires%20~66G%20of%20external%20data%20that%20needs%20to%20be%20downloaded%20and%20unarchived%3A)). Or if you have downloaded this database before, you may skip this first download step.
+## [GTDB](https://gtdb.ecogenomic.org/downloads) and [PLSDB](https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/) download
+Please note that GTDB/PLSDB database will not download automatically via the above installation, so the user can specify a friendly storage location because they take a lot of storage space: GTDB ([~66G](https://ecogenomics.github.io/GTDBTk/installing/index.html#installing-third-party-software:~:text=GTDB%2DTk%20requires%20~66G%20of%20external%20data%20that%20needs%20to%20be%20downloaded%20and%20unarchived%3A)) and PLSDB (~3.4G). Or if you have downloaded the above databases before, you may skip the first download step, just following the location setting step.
 ```
-wget https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_v2_data.tar.gz && tar xvzf gtdbtk_v2_data.tar.gz ## May skip if you have done before or GTDB database has been downloaded in the server
+## download database: May skip if you have done before or GTDB and PLSDB have been downloaded in the server
+wget https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_v2_data.tar.gz && tar xvzf gtdbtk_v2_data.tar.gz ## 
+wget wget https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/plsdb.fna.bz2 && bunzip2 plsdb.fna.bz2
 conda activate nanophase
-echo "export GTDBTK_DATA_PATH=/path/to/release/package/" > $(dirname $(dirname `which nanophase`))/etc/conda/activate.d/gtdbtk.sh ## Change /path/to/release/package/ to the real location where you storaged the GTDB database
+## setting location
+echo "export GTDBTK_DATA_PATH=/path/to/release/package/" > $(dirname $(dirname `which nanophase`))/etc/conda/activate.d/np_db.sh ## Change /path/to/release/package/ to the real location where you stored the GTDB
+echo "export PLSDB_PATH=/path/to/plsdb.fna" >> $(dirname $(dirname `which nanophase`))/etc/conda/activate.d/np_db.sh ## Change /path/to/plsdb.fna to the real location where you stored the PLSDB
 conda deactivate && conda activate nanophase ## require re-activate nanophase
 ```
 ## Usage
@@ -42,6 +46,7 @@ Please look at [nanophase usage tutorial](https://github.com/Hydro3639/nanophase
 Briefly, you may check if all necessary packages have been installed sucessfully in the nanophase env using the following command.
 ```
 conda activate nanophase ## if not in the nanophase env
+
 nanophase check
 
 Check software availability and locations
@@ -72,7 +77,7 @@ If all pakcages have been installed sucessfully in the nanophase env, type `nano
 ```
 nanophase -h
 
-nanophase v=0.2.0
+nanophase v=0.2.2
 
 Main modules
         check                   check if all packages have been installed
@@ -81,6 +86,7 @@ Main modules
 
 Test modules
         args                    Antibiotic Resistance Genes (ARGs) identification from reconstructed MAGs
+        plasmid                 Plasmid identification from reconstructed MAGs
 
 Other options
         -h | --help             show the help message
@@ -93,6 +99,7 @@ example usage:
         nanophase isolate -l ont.fastq.gz -t 16 -o nanophase-out                                                ## isolate::long reads only
         nanophase isolate -l ont.fastq.gz --hybrid -1 sr_1.fastq.gz -2 sr_2.fastq.gz -t 16 -o nanophase-out     ## isolate::hybrid strategy
         nanophase args -i Final-bins -x fasta -o nanophase.ARGs.summary.txt                                     ## ARGs identification
+        nanophase plasmid -i Final-bins -x fasta -o nanophase.pls.summary.txt                                   ## Plasmids identification
         
 ```
 Each module is run separately. For example, to check the nanophase `meta` module, type `nanophase meta -h` for more usage information.

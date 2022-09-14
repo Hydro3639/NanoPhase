@@ -6,7 +6,7 @@ set -eo pipefail
 ###### Usage ######
 show_help(){
 cat << EOF
-`echo "nanophase v=$VERSION"`
+`np_version`
 
 arguments:
 	--long_read_only	only Nanopore long reads were involved [default: on]
@@ -39,7 +39,9 @@ CRTDIR=$(cd `dirname $0`; pwd)
 OutDIR="nanophase-out"
 #check_pkg="false"
 medaka_model="r941_min_hac_g507"
-VERSION="0.2.1"
+base_dir=$(cd `dirname $0`; pwd)
+np_version(){ echo -e `$base_dir/nanophase -v`; }
+
 
 ## call command to tmp_cmd
 tmp_cmd=`echo -e "\nCommand line: $CRTDIR/nanophase isolate $*"`
@@ -58,7 +60,7 @@ while true; do
                 -t | --threads) N_threads=$2; shift 2;;
                 -o | --out) OutDIR=$2; shift 2;;
                 -m | --medaka_model) medaka_model=$2; shift 2;;
-                -v | --version) echo "nanophase v=$VERSION"; exit 0; shift; break;;
+                -v | --version) np_version; exit 0; shift; break;;
                 --hybrid) Type=hybrid; shift 1;;
                 --long-read-only) Type=long_read_only; shift 1;;
                 --check) check_pkg=true; shift 1;;
@@ -330,7 +332,7 @@ genome_stats(){
 	sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tGTDB-Taxa' $OutDIR/03-Polishing/tmp.nanophase.genome.summary > $OutDIR/03-Polishing/nanophase.ont.genome.summary
 	
 	## add circular Info from flye assemblies, as well as length Info
-        awk '{print /^>/ ? $0 : "length="length($0) }' $OutDIR/03-Polishing/Final-bins/bin.fasta | xargs -n2 | sed -e 's/^>//g' | while read line1 line2; do grep -w $line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print "circular="$4}' | paste <(echo $line1 $line2) - | tr "\t" " "; done | while read line1 line2 line3; do sed -i 's/\<'$line1'\>/'$line1' '$line2' '$line3'/g' $OutDIR/03-Polishing/Final-bins/bin.fasta; done
+        awk '{print /^>/ ? $0 : "length="length($0) }' $OutDIR/03-Polishing/Final-bins/bin.fasta | xargs -n2 | sed -e 's/^>//g' | while read line1 line2; do grep -w $line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print "cov="$3"\t""circular="$4}' | paste <(echo $line1 $line2) - | tr "\t" " "; done | while read line1 line2 line3 line4; do sed -i 's/>'$line1'$/>'$line1' '$line2' '$line3' '$line4'/g' $OutDIR/03-Polishing/Final-bins/bin.fasta; done
 	# clean up
 	rm -rf $OutDIR/03-Polishing/Final-bins/tmp* && rm -rf $OutDIR/03-Polishing/Final-bins/checkm* && rm -rf $OutDIR/03-Polishing/tmp.nanophase.genome.summary
 
@@ -487,7 +489,7 @@ genome_stats(){
         sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tGTDB-Taxa' $OutDIR/03-Polishing/tmp.nanophase.genome.summary > $OutDIR/03-Polishing/nanophase.hybrid.genome.summary
 
         ## add circular Info from flye assemblies, as well as length Info
-	awk '{print /^>/ ? $0 : "length="length($0) }' $OutDIR/03-Polishing/Final-bins/bin.fasta | xargs -n2 | sed -e 's/^>//g' | while read line1 line2; do grep -w $line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print "circular="$4}' | paste <(echo $line1 $line2) - | tr "\t" " "; done | while read line1 line2 line3; do sed -i 's/\<'$line1'\>/'$line1' '$line2' '$line3'/g' $OutDIR/03-Polishing/Final-bins/bin.fasta; done
+	awk '{print /^>/ ? $0 : "length="length($0) }' $OutDIR/03-Polishing/Final-bins/bin.fasta | xargs -n2 | sed -e 's/^>//g' | while read line1 line2; do grep -w $line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print "cov="$3"\t""circular="$4}' | paste <(echo $line1 $line2) - | tr "\t" " "; done | while read line1 line2 line3 line4; do sed -i 's/>'$line1'$/>'$line1' '$line2' '$line3' '$line4'/g' $OutDIR/03-Polishing/Final-bins/bin.fasta; done
         # clean up
         rm -rf $OutDIR/03-Polishing/Final-bins/tmp* && rm -rf $OutDIR/03-Polishing/Final-bins/checkm* && rm -rf $OutDIR/03-Polishing/tmp.nanophase.genome.summary
 

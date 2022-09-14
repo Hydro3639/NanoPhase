@@ -6,8 +6,7 @@ set -eo pipefail
 ###### Usage ######
 show_help(){
 cat << EOF
-
-`echo "nanophase v=$VERSION"`
+`np_version`
 
 arguments:
 	--long_read_only	only Nanopore long reads were involved [default: on]
@@ -45,7 +44,9 @@ CRTDIR=$(cd `dirname $0`; pwd)
 OutDIR="nanophase-out"
 check_pkg="false"
 medaka_model="r941_min_hac_g507"
-VERSION="0.2.1"
+base_dir=$(cd `dirname $0`; pwd)
+np_version(){ echo -e `$base_dir/nanophase -v`; }
+
 
 ## call command to tmp_cmd
 tmp_cmd=`echo -e "\nCommand line: $CRTDIR/nanophase meta $*"`
@@ -65,7 +66,7 @@ while true; do
 		-t | --threads) N_threads=$2; shift 2;;
 		-o | --out) OutDIR=$2; shift 2;;
 		-m | --medaka_model) medaka_model=$2; shift 2;;
-		-v | --version) echo "nanophase v=$VERSION"; exit 0; shift; break;;
+		-v | --version) np_version; exit 0; shift; break;;
 		--hybrid) Type=hybrid; shift 1;;
 		--long-read-only) Type=long_read_only; shift 1;;
 		-h | --help) show_help; exit 0; shift 1;;
@@ -600,24 +601,30 @@ genome_stats(){
 	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
 
 	paste $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness $OutDIR/03-Polishing/Final-bins/tmp.genome-stats $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted | sort -t. -k2n | sed -e 's/.medaka//g' > $OutDIR/03-Polishing/tmp.nanophase.genome.summary
-	
-	## extract circular Info from flye assemblies
-	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | awk '{print $1"\t"$6}' | while read binID N_Contig; do
-	if [[ $N_Contig == 1 ]]; then
-		grep "^>" $OutDIR/03-Polishing/Final-bins/${binID}.medaka.fasta | cut -d_ -f2-3 | while read ContigID; do grep -w $ContigID $OutDIR/01-LongAssemblies/assembly_info.txt ; done | awk '{print $4}' | while read CirInfo; do
-		if [[ $CirInfo == Y ]]; then 
-			echo "Y"
-		else
-			echo "N"
-		fi; done
-	else
-		echo "N"
-	fi; done | paste $OutDIR/03-Polishing/tmp.nanophase.genome.summary - | awk -F"\t" -v OFS="\t" '{temp = $9; $9 = $10; $10 = temp; print $0}' | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tIfCir.\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.ont.genome.summary
+	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.ont.genome.summary
+
+### remove the following: circular MAGs based on the contig number	
+#	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | awk '{print $1"\t"$6}' | while read binID N_Contig; do
+#	if [[ $N_Contig == 1 ]]; then
+#		grep "^>" $OutDIR/03-Polishing/Final-bins/${binID}.medaka.fasta | cut -d_ -f2-3 | while read ContigID; do grep -w $ContigID $OutDIR/01-LongAssemblies/assembly_info.txt ; done | awk '{print $4}' | while read CirInfo; do
+#		if [[ $CirInfo == Y ]]; then 
+#			echo "Y"
+#		else
+#			echo "N"
+#		fi; done
+#	else
+#		echo "N"
+#	fi; done | paste $OutDIR/03-Polishing/tmp.nanophase.genome.summary - | awk -F"\t" -v OFS="\t" '{temp = $9; $9 = $10; $10 = temp; print $0}' | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tIfCir.\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.ont.genome.summary
 	
 	# clean up and rename
 	rm -rf $OutDIR/03-Polishing/Final-bins/tmp* && rm -rf $OutDIR/03-Polishing/Final-bins/checkm* && rm -rf $OutDIR/03-Polishing/tmp.nanophase.genome.summary 
 	#rename 's/medaka\.fasta/fasta/' $OutDIR/03-Polishing/Final-bins/*fasta ## linux-rename not equal perl-rename
 	ls $OutDIR/03-Polishing/Final-bins/*medaka.fasta | sed -e "s/.medaka.fasta//g" | while read line; do mv ${line}.medaka.fasta ${line}.fasta; done
+
+        ## extract circular/cov Info from flye assemblies
+        ls $OutDIR/03-Polishing/Final-bins/*fasta | awk -F"/" '{print $NF}' | sed -e 's/.fasta//g' | sort -t. -k2n | xargs -P $N_threads -I {} echo "awk '{print /^>/ ? \$0 : \"length=\"length(\$0) }' $OutDIR/03-Polishing/Final-bins/{}.fasta | xargs -n2 | cut -d_ -f2-100 | while read line1 line2; do grep -w \$line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print \"cov=\"\$3\"\\t\"\"circular=\"\$4}' | paste <(echo \$line1 \$line2) - | tr \"\\t\" \" \"; done | while read line1 line2 line3 line4 ; do echo \"s\/>{}_\$line1\$/>{}_\$line1 \$line2 \$line3 \$line4/g;\"; done | xargs | sed -e \"s/^/sed -i '/g\" -e \"s/g;\$/g'/g\"  | paste - <(echo "$OutDIR/03-Polishing/Final-bins/{}.fasta")" > $OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh
+        parallel -j $N_threads -k <$OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh > $OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
+        parallel -j $N_threads -k <$OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
 
 	Fin_Num_final_bins=`ls -lht $OutDIR/03-Polishing/Final-bins/*fasta 2>/dev/null | awk '$5!=0' | wc -l`
 	if [[ -s $OutDIR/03-Polishing/nanophase.ont.genome.summary ]] && [[ $Fin_Num_final_bins == `tail -n+2 $OutDIR/03-Polishing/nanophase.ont.genome.summary | wc -l | awk '{print $1}'` ]]; then
@@ -625,7 +632,7 @@ genome_stats(){
 		Final bins could be found in $OutDIR/03-Polishing/Final-bins/ and
 		bin summary file is $OutDIR/03-Polishing/nanophase.ont.genome.summary"
 		# clean up LongSeq clusters
-		rm -rf $OutDIR/03-Polishing/LongSeqs/ && rm -rf $OutDIR/03-Polishing/binIDs && rm -rf $OutDIR/03-Polishing/flye_assembled.bins.fasta
+		rm -rf $OutDIR/03-Polishing/LongSeqs/ && rm -rf $OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh && rm -rf $OutDIR/03-Polishing/binIDs && rm -rf $OutDIR/03-Polishing/flye_assembled.bins.fasta
 	else
 		echo "`datetime.ERROR` Something wrong with genome statistics of medaka-polished bins, terminating..."
 		exit 1; >&2
@@ -887,8 +894,8 @@ hybrid_genome_stats(){
 genome_stats(){
 	##
 	ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*fa | awk -F"/" '{print $NF}' | sed -e 's/.fa//g' | sort -t. -k2n > $OutDIR/03-Polishing/binIDs
-	##
-	cat $OutDIR/03-Polishing/binIDs | while read line; do cp $OutDIR/03-Polishing/POLCA/POLCA-bins/${line}-polca.fasta $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.polca.fasta; done
+	## change multi-line fasta to 2-line fasta:
+	cat $OutDIR/03-Polishing/binIDs | while read line; do seqtk seq -l0 $OutDIR/03-Polishing/POLCA/POLCA-bins/${line}-polca.fasta > $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.polca.fasta; done
 	## checkm evaluation
 	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]] && [[ `wc -l $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness | awk '{print $1}'` == `cat $OutDIR/03-Polishing/binIDs | wc -l` ]]; then
 		echo "`datetime.INFO` genome quality assessment has been finished. Now, go to the next stage: genome classification"
@@ -943,19 +950,20 @@ genome_stats(){
 	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
 
 	paste $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness $OutDIR/03-Polishing/Final-bins/tmp.genome-stats $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted | sort -t. -k2n | sed -e 's/.polca//g' > $OutDIR/03-Polishing/tmp.nanophase.genome.summary
-	
-	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | awk '{print $1"\t"$6}' | while read binID N_Contig; do
-	## Add circular Info from flye assemblies
-	if [[ $N_Contig == 1 ]]; then
-		grep "^>" $OutDIR/03-Polishing/Final-bins/${binID}.polca.fasta | cut -d_ -f2-3 | while read ContigID; do grep -w $ContigID $OutDIR/01-LongAssemblies/assembly_info.txt ; done | awk '{print $4}' | while read CirInfo; do
-		if [[ $CirInfo == Y ]]; then 
-			echo "Y"
-		else
-			echo "N"
-		fi; done
-	else
-		echo "N"
-	fi; done | paste $OutDIR/03-Polishing/tmp.nanophase.genome.summary - | awk -F"\t" -v OFS="\t" '{temp = $9; $9 = $10; $10 = temp; print $0}' | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tIfCir.\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.hybrid.genome.summary
+	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.hybrid.genome.summary
+
+### remove the following: circular MAGs based on the contig number
+#	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | awk '{print $1"\t"$6}' | while read binID N_Contig; do
+#	if [[ $N_Contig == 1 ]]; then
+#		grep "^>" $OutDIR/03-Polishing/Final-bins/${binID}.polca.fasta | cut -d_ -f2-3 | while read ContigID; do grep -w $ContigID $OutDIR/01-LongAssemblies/assembly_info.txt ; done | awk '{print $4}' | while read CirInfo; do
+#		if [[ $CirInfo == Y ]]; then 
+#			echo "Y"
+#		else
+#			echo "N"
+#		fi; done
+#	else
+#		echo "N"
+#	fi; done | paste $OutDIR/03-Polishing/tmp.nanophase.genome.summary - | awk -F"\t" -v OFS="\t" '{temp = $9; $9 = $10; $10 = temp; print $0}' | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tIfCir.\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.hybrid.genome.summary
 	
 	# clean up and rename
 	rm -rf $OutDIR/03-Polishing/Final-bins/tmp* && rm -rf $OutDIR/03-Polishing/Final-bins/checkm* && rm -rf $OutDIR/03-Polishing/tmp.nanophase.genome.summary 
@@ -964,13 +972,19 @@ genome_stats(){
 	ls $OutDIR/03-Polishing/Final-bins/*polca.fasta | sed -e "s/.polca.fasta//g" | while read line; do mv ${line}.polca.fasta ${line}.fasta; done
 	ls $OutDIR/03-Polishing/Final-bins/*fasta | while read line; do sed -i 's/_polypolish//g' $line; done
 	
+        ## extract circular/cov Info from flye assemblies
+        #ls $OutDIR/03-Polishing/Final-bins/*fasta | awk -F"/" '{print $NF}' | sed -e 's/.fasta//g' | sort -t. -k2n | xargs -P $N_threads -I {} echo "awk '{print /^>/ ? \$0 : \"length=\"length(\$0) }' $OutDIR/03-Polishing/Final-bins/{}.fasta | xargs -n2 | cut -d_ -f2-100 | while read line1 line2; do grep -w \$line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print \"cov=\"\$3\"\\t\"\"circular=\"\$4}' | paste <(echo \$line1 \$line2) - | tr \"\\t\" \" \"; done | while read line1 line2 line3 line4; do sed -i 's/>{}_'\$line1'\$/>{}_'\$line1' '\$line2' '\$line3' '\$line4'/g' $OutDIR/03-Polishing/Final-bins/{}.fasta; done" >$OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
+	ls $OutDIR/03-Polishing/Final-bins/*fasta | awk -F"/" '{print $NF}' | sed -e 's/.fasta//g' | sort -t. -k2n | xargs -P $N_threads -I {} echo "awk '{print /^>/ ? \$0 : \"length=\"length(\$0) }' $OutDIR/03-Polishing/Final-bins/{}.fasta | xargs -n2 | cut -d_ -f2-100 | while read line1 line2; do grep -w \$line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print \"cov=\"\$3\"\\t\"\"circular=\"\$4}' | paste <(echo \$line1 \$line2) - | tr \"\\t\" \" \"; done | while read line1 line2 line3 line4 ; do echo \"s\/>{}_\$line1\$/>{}_\$line1 \$line2 \$line3 \$line4/g;\"; done | xargs | sed -e \"s/^/sed -i '/g\" -e \"s/g;\$/g'/g\"  | paste - <(echo "$OutDIR/03-Polishing/Final-bins/{}.fasta")" > $OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh
+	parallel -j $N_threads -k <$OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh > $OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
+        parallel -j $N_threads -k <$OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
+
 	Fin_Num_final_bins=`ls -lht $OutDIR/03-Polishing/Final-bins/*fasta 2>/dev/null | awk '$5!=0' | wc -l`
 	if [[ -s $OutDIR/03-Polishing/nanophase.hybrid.genome.summary ]] && [[ $Fin_Num_final_bins == `tail -n+2 $OutDIR/03-Polishing/nanophase.hybrid.genome.summary | wc -l | awk '{print $1}'` ]]; then
 		echo "`datetime.DONE` Genome statistics finished sucessfully
 		Final bins could be found in $OutDIR/03-Polishing/Final-bins/ and
 		bin summary file is $OutDIR/03-Polishing/nanophase.hybrid.genome.summary"
 		## clean up ShortSeqs and LongSeqs
-		rm -rf $OutDIR/03-Polishing/ShortSeqs/ && rm -rf $OutDIR/03-Polishing/LongSeqs/ && rm -rf $OutDIR/03-Polishing/binIDs && rm -rf $OutDIR/03-Polishing/flye_assembled.bins.fasta
+		rm -rf $OutDIR/03-Polishing/ShortSeqs/ && rm -rf $OutDIR/03-Polishing/Final-bins/tmp.*rename.bin.sh && rm -rf $OutDIR/03-Polishing/LongSeqs/ && rm -rf $OutDIR/03-Polishing/binIDs && rm -rf $OutDIR/03-Polishing/flye_assembled.bins.fasta
 	else
 		echo "`datetime.ERROR` Something wrong with genome statistics of polca-polished bins, terminating..."
 		exit 1; >&2

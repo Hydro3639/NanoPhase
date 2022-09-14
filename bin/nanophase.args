@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-## nanophase (args) is designed for identifying the potential Antobiotic Resistance Genes (ARGs) from the reconstructed MAGs (Currently by nanophase)
+## nanophase (args) is designed for identifying the potential Antobiotic Resistance Genes (ARGs) from the reconstructed MAGs
 set -eo pipefail
 
 
 ###### Usage ######
 show_help(){
 cat << EOF
-`echo "nanophase v=$VERSION"`
+`np_version`
 
 arguments:
         -i, --input	        input directory containing genome files
 	-x, --extension		genomes extension [default: fasta]
 	-o, --output		output file name [default: nanophase.ARGs.summary.txt]
-	-s, --similarity	the similarity cutoff for blastp to search the SARG database (%) [default: 70]
+	-d, --database          antibiotic resitance genes (ARGs) database location [default: SARG location]
+	-f, --structure		structure file, only required when using customized database [default: SARG structure file]
+	-s, --similarity	the similarity cutoff for blastp to search ARG database (%) [default: 70]
 	-c, --coverage		the coverage cutoff for blastp alignment fraction (%) [default: 70]
 	-t, --threads           number of threads [default: 16]
         -h, --help              print help information and exit
@@ -28,8 +30,8 @@ EOF
 
 ## default parameters
 OPTIND=1 # Reset in case getopts has been used previously in the shell
-
-VERSION="0.2.1"
+CRTDIR=$(cd `dirname $0`; pwd)
+uniq_folder=`date +%s`
 bin_suffix=fasta
 N_threads="16"
 #input_folder="Final-bins/"
@@ -37,19 +39,23 @@ output_file="nanophase.ARGs.summary.txt"
 similarity="70"
 coverage="70"
 download="no"
+base_dir=$(cd `dirname $0`; pwd)
+argdb_path="$base_dir/SARG.fasta"
+str_file="$base_dir/single-component_structure.txt"
+np_version(){ echo -e `$base_dir/nanophase -v`; }
 
 ## log file
 datetime.CHECK(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] CHECK:; }
 #datetime.TASK(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] TASK:; }
 datetime.INFO(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] INFO:; }
-#datetime.WARNING(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] WARNING:; }
+datetime.WARNING(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] WARNING:; }
 datetime.ERROR(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] ERROR:; }
 datetime.DONE(){ Date=`date "+%Y-%m-%d %H:%M:%S"`; echo [$Date] DONE:; }
 
 ## call command to tmp_cmd
 tmp_cmd=`echo -e "\nCommand line: $CRTDIR/nanophase args $*"`
 ##
-params="$(getopt -o hi:t:s:c:o:x:v --long help,input:,threads:,similarity:,coverage:,out:,extension:,download,version -- "$@")"
+params="$(getopt -o hi:t:s:c:o:x:d:f:v --long help,input:,threads:,similarity:,coverage:,out:,extension:,database:,structure:,download,version -- "$@")"
 if [[ $? -gt 0 ]]; then show_help; exit 1; fi
 if [[ $# == 0 ]]; then show_help; exit 1; fi
 
@@ -62,10 +68,12 @@ while true; do
 		-i | --input) input_folder=$2; shift 2;;
 		-o | --out) output_file=$2; shift 2;;
 		-x | --extension) bin_suffix=$2; shift 2;;
+		-d | --database) argdb_path=$2; shift 2;;
+		-f | --structure) str_file=$2; shift 2;;
 		-s | --similarity) similarity=$2; shift 2;;
 		-c | --coverage) coverage=$2; shift 2;;
 		--download) download=yes; shift 1;;
-		-v | --version) echo "nanophase v=$VERSION"; exit 0; shift; break;;
+		-v | --version) np_version; exit 0; shift; break;;
 		-h | --help) show_help; exit 0; shift 1;;
 		--) show_help; exit 0; shift; break ;;
 		*) break;;
@@ -113,20 +121,46 @@ fi
 }
 ## End of package check
 
-## SARG database check
+## ARG database check
 db_check(){
-echo "`datetime.CHECK` Check SARG databse availability and locations"
-db_dir=$(dirname `which nanophase`)
-SARG_db_check=`ls $db_dir/SARG.fasta* 2>/dev/null | wc -l`
-SARG_index_check=`ls $db_dir/*component_structure.txt 2>/dev/null | wc -l`
-
-if [[ $SARG_db_check -gt 1 ]] && [[ $SARG_index_check -eq 3 ]]; then
-	echo -e "`datetime.INFO` SARG database and structure files were found in $(dirname `which nanophase`)\n"
+echo "`datetime.CHECK` Check ARG databse availability and locations"
+if [[ -s $argdb_path ]]; then
+        echo "`datetime.INFO` ARG database was found in $argdb_path"
+        argdb_name=`ls $argdb_path | awk -F"/" '{print $NF}'`
+	de_argdb=$(dirname `which nanophase`)
+	db_dir=$(dirname $argdb_path)
+	db_stru_dir=$(dirname $str_file)
+       	if [[ $de_argdb == $db_dir ]] && [[ $argdb_name == "SARG.fasta" ]]; then
+                echo "`datetime.INFO` Seems SARG database (v3.1.3; Yin, Xiaole, et al. 2022) is used as the database"
+		SARG_stru_check=`ls $db_dir/*component_structure.txt 2>/dev/null | wc -l`
+		if [[ $SARG_stru_check -eq 3 ]]; then
+			echo "`datetime.INFO` Both SARG database and structure file are found in the folder: $db_dir"
+		else
+			echo "`datetime.ERROR` Cannot find the structure file, make sure you have one, terminating..."
+			exit 1
+		fi
+        else
+                echo "`datetime.INFO` Seems the customized database is used, rather than the default one, please make sure it has the same format with SARG database"
+		str_file_name=`ls $str_file | awk -F"/" '{print $NF}'`
+		if [[ -s $str_file ]] && [[ $str_file_name == single-component_structure.txt ]]; then
+			echo "`datetime.WARNING` Please make sure you are using the appropriate structure file of the customized database"
+		elif [[ -s $str_file ]] && [[ $str_file_name != single-component_structure.txt ]]; then
+			echo "`datetime.INFO` Both customized database and structure file are found in the folder: $db_dir and $db_stru_dir"
+			if [[ `ls $argdb_path.p* | wc -l` -ge 3 ]]; then
+				echo "`datetime.INFO` Seems the customized database has been indexed, now skipping. If you are not sure if the index was correct, you may remove them and re-run this command"
+			else
+				echo "`datetime.INFO` Indexing the customized database"
+				makeblastdb -dbtype prot -in $argdb_path 1>/dev/null
+			fi
+		elif [[ ! -s $str_file ]]; then
+			echo "`datetime.ERROR` Cannot find the structure file, make sure you have one, terminating..."
+			exit 1
+		fi
+        fi
 else
-	echo "`datetime.ERROR` SARG database could not found. To fix this error, try 'nanophase args --download', terminating..."
-	exit 1
+        echo "`datetime.ERROR` Cannot find the ARG database, make sure you have one, terminating..."
+        exit 1
 fi
-
 }
 ## End of database check
 
@@ -161,9 +195,9 @@ if [[ -d $input_folder ]]; then
 		elif [[ $bin_suffix == fna ]]; then
 			num_bins=`ls $input_folder/*fna | wc -l`
 		fi
-		echo "`datetime.CHECK` $num_bins MAGs were found in the folder of $input_folder"
+		echo "`datetime.CHECK` $num_bins MAGs were found in the folder: $input_folder"
 	else
-		echo "`datetime.ERROR` No MAGs could be found in the folder of $input_folder, terminating..."
+		echo "`datetime.ERROR` No MAGs could be found in the folder: $input_folder, terminating..."
 	fi
 else
 	echo "`datetime.ERROR` Cannot found the folder $input_folder, terminating..."
@@ -172,42 +206,52 @@ fi
 ## End of check input MAGs
 
 ## define input and output
-base_dir=$(cd `dirname $0`; pwd)
+#base_dir=$(cd `dirname $0`; pwd)
 rp_input_folder=`realpath $input_folder`
 #output_folder=`dirname $rp_input_folder`
 
-##
-if [[ -d $rp_input_folder/tmp-ARGs ]]; then
-	rm -rf $rp_input_folder/tmp-ARGs && mkdir $rp_input_folder/tmp-ARGs
-else
-	mkdir -p $rp_input_folder/tmp-ARGs
-fi
+mkdir -p $rp_input_folder/tmp-ARGs-$uniq_folder
+## two commands with different cutoff will cause error
+#if [[ -d $rp_input_folder/tmp-ARGs-* ]]; then
+#	rm -rf $rp_input_folder/tmp-ARGs-* && mkdir $rp_input_folder/tmp-ARGs-$uniq_folder
+#else
+#	mkdir -p $rp_input_folder/tmp-ARGs-$uniq_folder
+#fi
 
 ##
 echo "`datetime.INFO` Run prodigal to predict ORFs (be patient)"
-ls $rp_input_folder/*${bin_suffix} | awk -F"/" '{print $NF}' | xargs -P $N_threads -I {} prodigal -a $rp_input_folder/tmp-ARGs/{}.faa -i $rp_input_folder/{} -q 1>/dev/null
+ls $rp_input_folder/*.${bin_suffix} | awk -F"/" '{print $NF}' | xargs -P $N_threads -I {} prodigal -a $rp_input_folder/tmp-ARGs-$uniq_folder/{}.faa -i $rp_input_folder/{} -q 1>/dev/null
 
-if [[ $N_threads -gt 6 ]]; then
-	blastp_threads=6
-	let arg_para=($N_threads+3)/6
-	N_threads_arg=$arg_para
-else
-	blastp_threads=$N_threads
-	N_threads_arg=1
-fi
+echo "`datetime.INFO` Blast to the provided database for ARGs identification (be patient)"
+## combine (all) predicted ORFs
+ls $rp_input_folder/tmp-ARGs-$uniq_folder/*faa | awk -F"/" '{print $NF}' | sed -e 's/.'${bin_suffix}'.faa//g' | xargs -P $N_threads -I {} sed -i 's/^>/>'{}#######'/g' $rp_input_folder/tmp-ARGs-$uniq_folder/{}.${bin_suffix}.faa
+cat $rp_input_folder/tmp-ARGs-$uniq_folder/*.${bin_suffix}.faa >$rp_input_folder/tmp-ARGs-$uniq_folder/combined.faa
 
-echo "`datetime.INFO` Blast to SARG database for ARGs identification (be patient)"
-ls $rp_input_folder/tmp-ARGs/*faa | awk -F"/" '{print $NF}' | xargs -P $N_threads_arg -I {} blastp -query $rp_input_folder/tmp-ARGs/{} -evalue 1e-5 -max_target_seqs 5 -num_threads $blastp_threads -db $base_dir/SARG.fasta -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs" -out $rp_input_folder/tmp-ARGs/{}.tmp.blast6.out
+## Support customized database
+blastp -query $rp_input_folder/tmp-ARGs-$uniq_folder/combined.faa -evalue 1e-5 -max_target_seqs 5 -num_threads $N_threads -db $argdb_path -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qcovs" -out $rp_input_folder/tmp-ARGs-$uniq_folder/tmp.blast6.out
 
 echo "`datetime.INFO` Summarize the result"
-cat $rp_input_folder/tmp-ARGs/*.tmp.blast6.out | awk '!a[$1]++' | awk -v awk_sim="$similarity" -v awk_cov="$coverage" '$3>=awk_sim && $NF>=awk_cov {print $1"\t"$3"\t"$2}' | while read line1 line2 line3; do paste <(echo -e $line1"\t"$line2) <(grep $line3 $base_dir/*-component_structure.txt | cut -d: -f2-100); done | cat <(paste <(echo -e "BinID_ContigID_OrfID\tSimilarity") <(head -1 $base_dir/single-component_structure.txt)) - | awk -F"\t" -v OFS="\t" '{print $0}' >$output_file
+rp_argdb=`realpath $argdb_path`
+de_argdb=$(dirname `which nanophase`)
+db_dir=$(dirname $argdb_path)
+
+if [[ $rp_argdb == $argdb_path ]] && [[ $de_argdb == $db_dir ]]; then
+	cat $rp_input_folder/tmp-ARGs-$uniq_folder/tmp.blast6.out | awk '!a[$1]++' | awk -v awk_sim="$similarity" -v awk_cov="$coverage" '$3>=awk_sim && $NF>=awk_cov {print $1"\t"$3"\t"$2}' | while read line1 line2 line3; do paste <(echo -e $line1"\t"$line2) <(grep -w $line3 $base_dir/*-component_structure.txt | cut -d: -f2-100); done | cat <(paste <(echo -e "BinID#######\tContigID_OrfID\tSimilarity") <(head -1 $base_dir/single-component_structure.txt)) - | sed -e 's/#######/\t/g' | awk -F"\t" -v OFS="\t" '{print $0}' >$output_file
+
+else
+	if [[ `awk -F"\t" '{print $NF}' $str_file` == single-component_structure.txt ]]; then
+		echo "`datetime.WARNING` Please make sure you are using the appropriate structure file of the customized database"
+	fi
+
+	cat $rp_input_folder/tmp-ARGs-$uniq_folder/tmp.blast6.out | awk '!a[$1]++' | awk -v awk_sim="$similarity" -v awk_cov="$coverage" '$3>=awk_sim && $NF>=awk_cov {print $1"\t"$3"\t"$2}' | while read line1 line2 line3; do paste <(echo -e $line1"\t"$line2) <(grep -w $line3 $str_file || echo "cannot find the information in the structure file, please check"); done | cat <(paste <(echo -e "BinID#######\tContigID_OrfID\tSimilarity") <(head -1 $str_file)) - | sed -e 's/#######/\t/g' | awk -F"\t" -v OFS="\t" '{print $0}' >$output_file
+fi
 
 if [[ `tail -n+2 $output_file | wc -l` -gt 1 ]]; then
 	echo "`datetime.DONE` ARGs identifiation from MAGs finished"
-	rm -rf $rp_input_folder/tmp-ARGs
+	rm -rf $rp_input_folder/tmp-ARGs-$uniq_folder
 elif [[ `cat $output_file | wc -l` == 1 ]]; then
 	echo "`datetime.DONE` ARGs identifiation from MAGs finished, but no ARG was identified. Maybe try to lower the screening criteria (but be cautious with the new results)"
-	rm -rf $rp_input_folder/tmp-ARGs && rm -rf $output_file
+	rm -rf $rp_input_folder/tmp-ARGs-$uniq_folder && rm -rf $output_file
 fi
 echo -e "`datetime.DONE` nanophase (args) finished and have a nice day!\n"
 

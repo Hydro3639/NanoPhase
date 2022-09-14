@@ -17,6 +17,7 @@
   * [minimap2](https://github.com/lh3/minimap2)
   * [parallel](https://anaconda.org/conda-forge/parallel)
   * [perl](https://github.com/Perl/perl5)
+  * [PLSDB](https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/)
   * [polca.sh](https://github.com/alekseyzimin/masurca#:~:text=4.%20Additional%20tools-,POLCA,-POLCA%20is%20a)
   * [polypolish](https://github.com/rrwick/Polypolish)
   * [pplacer](https://matsen.github.io/pplacer/)

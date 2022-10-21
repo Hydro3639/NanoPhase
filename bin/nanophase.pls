@@ -187,7 +187,7 @@ cov=`awk -v c="$coverage" 'BEGIN{printf"%.2f\n", c/100}'`
 minimap2 -c -x asm20 -t $N_threads --secondary=no $PLSDB_PATH $rp_input_folder/tmp-pls-$uniq_folder/combined.fasta > $rp_input_folder/tmp-pls-$uniq_folder/tmp.paf 2>/dev/null; awk '!a[$1]++' $rp_input_folder/tmp-pls-$uniq_folder/tmp.paf | awk -F'[:\t]' -v awk_dism="$dsim" -v awk_cov="$cov" '($4-$3+1)/$2 >=awk_cov && $39<=awk_dism {printf("%s\t%d\t%s\t%0.2f\n",$1,$2,$6,(1-$39)*100)}' | while read line1 line2 line3 line4 line5; do paste <(echo $line1 $line2 $line4 $line5) <(grep -w $line3 $PLSDB_PATH | cut -d" " -f2-100); done > $rp_input_folder/tmp-pls-$uniq_folder/tmp.pls.result
 
 echo "`datetime.INFO` Summarize the result"
-cat $rp_input_folder/tmp-pls-$uniq_folder/tmp.pls.result | sed -e 's/#######/\t/g' | sort -k2n | sed -e '1i#BinID\tContigID\tContig_Length(bp)\tIdentity(%)\tPlasmid_annotation' >$output_file
+cat $rp_input_folder/tmp-pls-$uniq_folder/tmp.pls.result | sed -e 's/#######/\t/g' | sort -k2n | cat <(echo -e "#BinID\tContigID\tContig_Length(bp)\tIdentity(%)\tPlasmid_annotation") - >$output_file
 
 if [[ ! -s $output_file ]]; then
 	echo "`datetime.ERROR` Summarize the result failed, terminating..."

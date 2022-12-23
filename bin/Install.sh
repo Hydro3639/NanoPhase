@@ -14,6 +14,7 @@ mamba activate NanoPhase
 #mamba install -c bioconda medaka=1.6.0 -y
 mamba install -c bioconda flye=2.9 metabat2=2.15 maxbin2=2.2.7 bwa=0.7.17 seqtk=1.3 masurca=4.0.9 -y
 mamba install -c conda-forge parallel -y
+mamba install -c bioconda semibin -y
 
 mamba remove samtools -y
 mamba install -c bioconda medaka=1.6.0 -y

@@ -24,6 +24,7 @@
   * [prodigal](https://github.com/hyattpd/Prodigal)
   * [racon](https://github.com/isovic/racon)
   * [maxbin2](https://sourceforge.net/projects/maxbin2/)
+  * [semibin](https://github.com/BigDataBiology/SemiBin)
   * [samtools](https://github.com/samtools/samtools)
   * [seqtk](https://github.com/lh3/seqtk)
   * [tabix](https://github.com/samtools/tabix)

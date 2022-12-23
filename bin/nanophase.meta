@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-## nanophase (meta) is designed for generating metagenome-assembled genomes (MAGs) from Nanopore metagenomic sequencing data using only Nanopore long reads (or hybrid strategy: Nanopore + Illumina)
+## nanophase (meta) is designed for generating metagenome-assembled genomes (MAGs) from metagenomics studies using only Nanopore long reads (or hybrid strategy: Nanopore + Illumina)
 set -eo pipefail
 
 
@@ -14,7 +14,8 @@ arguments:
 	-l, --long		Nanopore reads: fasta/q file that basecalled by Guppy 5+ or using 20+ chemistry was recommended if only Nanopore reads were included [Mandatory]
 	-1			Illumina short reads: fasta/q paired-end #1 file [Optional]
 	-2			Illumina short reads: fasta/q paired-end #2 file [Optional]
-	-m, --medaka_model	medaka model used for medaka polishing [default: r941_min_hac_g507]
+	-m, --medaka_model	medaka model used for medaka polishing [default: r1041_e82_400bps_sup_g615]
+	-e, --environment	Build-in model of SemiBin [default: wastewater]; detail see: SemiBin single_easy_bin -h
 	-t, --threads		number of threads that used for assembly and polishing [default: 16]
 	-o, --out		output directory [default: ./nanophase-out]
 	-h, --help		print help information and exit
@@ -42,8 +43,9 @@ ONT_seqs=""
 #SR2_seqs=""
 CRTDIR=$(cd `dirname $0`; pwd)
 OutDIR="nanophase-out"
+semibin_model="wastewater"
 check_pkg="false"
-medaka_model="r941_min_hac_g507"
+medaka_model="r1041_e82_400bps_sup_g615"
 base_dir=$(cd `dirname $0`; pwd)
 np_version(){ echo -e `$base_dir/nanophase -v`; }
 
@@ -51,7 +53,7 @@ np_version(){ echo -e `$base_dir/nanophase -v`; }
 ## call command to tmp_cmd
 tmp_cmd=`echo -e "\nCommand line: $CRTDIR/nanophase meta $*"`
 ##
-params="$(getopt -o hl:1:2:t:o:m:v --long help,hybrid,long:,long-read-only,threads:,medaka_model:,out:,check,version -- "$@")"
+params="$(getopt -o hl:1:2:e:t:o:m:v --long help,hybrid,long:,environment:,long-read-only,threads:,medaka_model:,out:,check,version -- "$@")"
 if [[ $? -gt 0 ]]; then show_help; exit 1; fi
 if [[ $# == 0 ]]; then show_help; exit 1; fi
 
@@ -63,6 +65,7 @@ while true; do
 		-1) SR1_seqs=$2; shift 2;;
 		-2) SR2_seqs=$2; shift 2;;
 		-l | --long) ONT_seqs=$2; shift 2;;
+		-e | --environment) semibin_model=$2; shift 2;;
 		-t | --threads) N_threads=$2; shift 2;;
 		-o | --out) OutDIR=$2; shift 2;;
 		-m | --medaka_model) medaka_model=$2; shift 2;;
@@ -167,7 +170,7 @@ echo  "`datetime.CHECK` Check software availability and locations"
 mkdir -p $OutDIR && rm -rf $OutDIR/.package.installed 2>/dev/null && rm -rf $OutDIR/.package.not.installed 2>/dev/null
 
 ## all required packages
-echo -e "nanophase\nflye\nmetabat2\nrun_MaxBin.pl\nmetawrap\ncheckm\nracon\nmedaka\npolypolish\npolca.sh\nbwa\nseqtk\nminimap2\nstats.sh\nparallel\nperl\nsamtools\ngtdbtk\nfastANI" | while read package; do
+echo -e "nanophase\nflye\nmetabat2\nrun_MaxBin.pl\nSemiBin\nmetawrap\ncheckm\nracon\nmedaka\npolypolish\npolca.sh\nbwa\nseqtk\nminimap2\nstats.sh\nparallel\nperl\nsamtools\ngtdbtk\nfastANI" | while read package; do
 if [[ "$(command -v $package)" ]]; then
 	echo -e "$package\t`which $package`" | sed -e 's/polca.sh/POLCA/1' -e 's/run_MaxBin.pl/maxbin2/1' -e 's/stats.sh/BBMap/g' | awk '{printf "%-20s %s\n", $1,$2}' >> $OutDIR/.package.installed
 else
@@ -208,11 +211,12 @@ long_read_assembly(){
 	fi
 	
 	## assembly
-        flye --meta --nano-hq $ONT_seqs -t $flye_threads -i 2 -g 5m -o $OutDIR/01-LongAssemblies/tmp >/dev/null 2>&1
+        mkdir -p $OutDIR/01-LongAssemblies/tmp
+	flye --meta --nano-hq $ONT_seqs -t $flye_threads -i 1 -g 5m -o $OutDIR/01-LongAssemblies/tmp > $OutDIR/01-LongAssemblies/tmp/flye.log.debug 2>&1
 	
 	flye_pass=`grep "Final assembly" <(tail -1 $OutDIR/01-LongAssemblies/tmp/flye.log) | wc -l`
 	if [[ $flye_pass != 1 ]]; then
-		echo "`datetime.ERROR` Something wrong with long-read (metaflye) assembly, please also check $OutDIR/01-LongAssemblies/tmp/flye.log for more information, terminating..."
+		echo "`datetime.ERROR` Something wrong with long-read (metaflye) assembly, please also check $OutDIR/01-LongAssemblies/tmp/flye.log.debug for more information, terminating..."
 		exit 1; >&2
 	fi
 
@@ -326,9 +330,71 @@ else
 	maxbin_binning
 fi
 
+### Test ###
+## SemiBin
+semibin_binning(){
+	## pre.: should check if contigs was larger than 4G, if >4Gb, should increase option _I to, for example, -I8g to index more reference bases in bactch. (require more memory)
+	contig_size=`tail -100 $OutDIR/01-LongAssemblies/flye.log | grep "Total length" | awk -F":" '{print int($2/1000000000+1)}'`
+	if [[ $contig_size -le 4 ]]; then
+		mini_ref=4
+	else
+		mini_ref=$contig_size
+	fi
+	
+	minimap2 -a -x map-ont -I${mini_ref}g -t $N_threads $OutDIR/01-LongAssemblies/assembly.fasta $ONT_seqs -o $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.sam >$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
+	samtools view -h -b -S -@ $N_threads $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.sam -o $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.bam >>$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
+	samtools view -b -F 4 -@ $N_threads $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.bam -o $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.mapped.bam >>$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
+	samtools sort -@ $N_threads $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.mapped.bam -o $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.mapped.sorted.bam >>$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
+	samtools index -@ $N_threads $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.mapped.sorted.bam >>$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
+	
+	## binning ## should check tranining type
+	SemiBin single_easy_bin --environment $semibin_model -i $OutDIR/01-LongAssemblies/assembly.fasta -b $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.mapped.sorted.bam -p $N_threads --semi-supervised --sequencing-type=long_read -o $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-output >>$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
+
+	## check if finished
+	str_semibin=`grep "Finished binning" $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>/dev/null | wc -l`
+	num_semibin=`ls $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-output/output_bins/*.fa 2>/dev/null | wc -l`
+	if [[ -s $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log ]] && [[ $str_semibin==1 ]] && [[ $num_semibin -gt 0 ]]; then
+		echo "`datetime.DONE` Initial binning::SemiBin binning finished sucessfully"
+		#mkdir -p $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-bins
+		ln -s `realpath $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-output/output_bins` `realpath $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-bins`
+
+		semibin_recover_bins=`cat $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log | grep "Number of bins" | awk -F"INFO " '{print $2}' | awk -F":" '{print $2}'`
+		echo -e "SemiBin recovered $semibin_recover_bins bins
+If you find SemiBin useful, please cite:
+Pan, S.; Zhu, C.; Zhao, XM.; Coelho, LP. A deep siamese neural network improves metagenome-assembled genomes in microbiome datasets across different environments. Nat Commun 13, 2326 (2022). https://doi.org/10.1038/s41467-022-29843-y." 
+
+		## remove bam/sam files
+		rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/semibin/*sam && rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/semibin/*bam && rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/semibin/*bam.bai
+
+	else
+		echo "`datetime.ERROR` Something wrong with SemiBin binning, please also check $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log, terminating..."
+		exit 1; >&2
+	fi
+}
+
+str_semibin=`grep "Binning finish" $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>/dev/null | wc -l`
+num_semibin=`ls $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-output/output_bins/*.fa 2>/dev/null | wc -l`
+if [[ -s $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log ]] && [[ $str_semibin==1 ]] && [[ $num_semibin -gt 0 ]]; then
+	echo "`datetime.INFO` SemiBin bins have been found in the folder $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-bins. Now go to the next stage: bin refinement...
+	Note: please ensure SemiBin binning finished sucessfully in the previous run, if not, please remove this folder using the command 'rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/semibin/' and re-run nanophase command"
+else
+	if [[ -d $OutDIR/02-LongBins/INITIAL_BINNING/semibin ]]; then
+		echo "`datetime.INFO` SemiBin binning re-starts"
+		rm -rf $OutDIR/02-LongBins/INITIAL_BINNING/semibin/*
+	else
+		echo "`datetime.TASK` Initial binning::SemiBin binning starts"
+		mkdir -p $OutDIR/02-LongBins/INITIAL_BINNING/semibin
+	fi
+	semibin_binning
+fi
+
+
+
+############
+
 ## metawarp bin_refinement
 bin_refinement(){
-	metawrap bin_refinement -o $OutDIR/02-LongBins/BIN_REFINEMENT -c 50 -x 10 -t $N_threads -A $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/metabat2-bins/ -B $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2-bins/ >$OutDIR/02-LongBins/BIN_REFINEMENT/bin_refinement.log 2>&1
+	metawrap bin_refinement -o $OutDIR/02-LongBins/BIN_REFINEMENT -c 50 -x 10 -t $N_threads -A $OutDIR/02-LongBins/INITIAL_BINNING/metabat2/metabat2-bins/ -B $OutDIR/02-LongBins/INITIAL_BINNING/maxbin2/maxbin2-bins/ -C $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-bins >$OutDIR/02-LongBins/BIN_REFINEMENT/bin_refinement.log 2>&1
 	# if biopython error, may try python3
 	Fin_Num_refineBins=`ls $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins/bin.*.fa 2>/dev/null | wc -l`
 	if [[ -s $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats ]] && [[ `tail -n+2 $OutDIR/02-LongBins/BIN_REFINEMENT/metawrap_50_10_bins.stats | wc -l` == $Fin_Num_refineBins ]]; then
@@ -623,8 +689,8 @@ genome_stats(){
 
         ## extract circular/cov Info from flye assemblies
         ls $OutDIR/03-Polishing/Final-bins/*fasta | awk -F"/" '{print $NF}' | sed -e 's/.fasta//g' | sort -t. -k2n | xargs -P $N_threads -I {} echo "awk '{print /^>/ ? \$0 : \"length=\"length(\$0) }' $OutDIR/03-Polishing/Final-bins/{}.fasta | xargs -n2 | cut -d_ -f2-100 | while read line1 line2; do grep -w \$line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print \"cov=\"\$3\"\\t\"\"circular=\"\$4}' | paste <(echo \$line1 \$line2) - | tr \"\\t\" \" \"; done | while read line1 line2 line3 line4 ; do echo \"s\/>{}_\$line1\$/>{}_\$line1 \$line2 \$line3 \$line4/g;\"; done | xargs | sed -e \"s/^/sed -i '/g\" -e \"s/g;\$/g'/g\"  | paste - <(echo "$OutDIR/03-Polishing/Final-bins/{}.fasta")" > $OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh
-        parallel -j $N_threads -k <$OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh > $OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
-        parallel -j $N_threads -k <$OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
+        parallel -j $N_threads <$OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh > $OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
+        parallel -j $N_threads <$OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
 
 	Fin_Num_final_bins=`ls -lht $OutDIR/03-Polishing/Final-bins/*fasta 2>/dev/null | awk '$5!=0' | wc -l`
 	if [[ -s $OutDIR/03-Polishing/nanophase.ont.genome.summary ]] && [[ $Fin_Num_final_bins == `tail -n+2 $OutDIR/03-Polishing/nanophase.ont.genome.summary | wc -l | awk '{print $1}'` ]]; then
@@ -975,8 +1041,8 @@ genome_stats(){
         ## extract circular/cov Info from flye assemblies
         #ls $OutDIR/03-Polishing/Final-bins/*fasta | awk -F"/" '{print $NF}' | sed -e 's/.fasta//g' | sort -t. -k2n | xargs -P $N_threads -I {} echo "awk '{print /^>/ ? \$0 : \"length=\"length(\$0) }' $OutDIR/03-Polishing/Final-bins/{}.fasta | xargs -n2 | cut -d_ -f2-100 | while read line1 line2; do grep -w \$line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print \"cov=\"\$3\"\\t\"\"circular=\"\$4}' | paste <(echo \$line1 \$line2) - | tr \"\\t\" \" \"; done | while read line1 line2 line3 line4; do sed -i 's/>{}_'\$line1'\$/>{}_'\$line1' '\$line2' '\$line3' '\$line4'/g' $OutDIR/03-Polishing/Final-bins/{}.fasta; done" >$OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
 	ls $OutDIR/03-Polishing/Final-bins/*fasta | awk -F"/" '{print $NF}' | sed -e 's/.fasta//g' | sort -t. -k2n | xargs -P $N_threads -I {} echo "awk '{print /^>/ ? \$0 : \"length=\"length(\$0) }' $OutDIR/03-Polishing/Final-bins/{}.fasta | xargs -n2 | cut -d_ -f2-100 | while read line1 line2; do grep -w \$line1 $OutDIR/01-LongAssemblies/assembly_info.txt | awk '{print \"cov=\"\$3\"\\t\"\"circular=\"\$4}' | paste <(echo \$line1 \$line2) - | tr \"\\t\" \" \"; done | while read line1 line2 line3 line4 ; do echo \"s\/>{}_\$line1\$/>{}_\$line1 \$line2 \$line3 \$line4/g;\"; done | xargs | sed -e \"s/^/sed -i '/g\" -e \"s/g;\$/g'/g\"  | paste - <(echo "$OutDIR/03-Polishing/Final-bins/{}.fasta")" > $OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh
-	parallel -j $N_threads -k <$OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh > $OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
-        parallel -j $N_threads -k <$OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
+	parallel -j $N_threads <$OutDIR/03-Polishing/Final-bins/tmp.pre-rename.bin.sh > $OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
+        parallel -j $N_threads <$OutDIR/03-Polishing/Final-bins/tmp.rename.bin.sh
 
 	Fin_Num_final_bins=`ls -lht $OutDIR/03-Polishing/Final-bins/*fasta 2>/dev/null | awk '$5!=0' | wc -l`
 	if [[ -s $OutDIR/03-Polishing/nanophase.hybrid.genome.summary ]] && [[ $Fin_Num_final_bins == `tail -n+2 $OutDIR/03-Polishing/nanophase.hybrid.genome.summary | wc -l | awk '{print $1}'` ]]; then
@@ -1032,6 +1098,7 @@ elif [[ $Type = hybrid ]]; then
         ## full-stage hybrid strategy
         package_check && long_read_only_strategy && sr_polypolish_polca_polishing && hybrid_genome_stats && echo
 fi
+## end
 
 echo -e "`datetime.DONE` nanophase finished and have a nice day!\n"
 ##########################

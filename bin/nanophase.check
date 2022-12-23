@@ -6,7 +6,7 @@ set -eo pipefail
 	echo -e "\nCheck software availability and locations"
         rm -rf .package.installed 2>/dev/null && rm -rf .package.not.installed 2>/dev/null
 
-        echo -e "flye\nmetabat2\nrun_MaxBin.pl\nmetawrap\ncheckm\nracon\nmedaka\npolypolish\npolca.sh\nbwa\nseqtk\nminimap2\nstats.sh\nparallel\nperl\nsamtools\ngtdbtk\nfastANI\nblastp" | while read package; do
+        echo -e "flye\nmetabat2\nrun_MaxBin.pl\nSemiBin\nmetawrap\ncheckm\nracon\nmedaka\npolypolish\npolca.sh\nbwa\nseqtk\nminimap2\nstats.sh\nparallel\nperl\nsamtools\ngtdbtk\nfastANI\nblastp" | while read package; do
         if [[ "$(command -v $package)" ]]; then
                 echo -e "$package\t`which $package`" | sed -e 's/polca.sh/POLCA/1' -e 's/run_MaxBin.pl/maxbin2/1' -e 's/stats.sh/BBMap/g' | awk '{printf "%-20s %s\n", $1,$2}' >> .package.installed
         else

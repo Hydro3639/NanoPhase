@@ -15,17 +15,18 @@ conda config --add channels bioconda
 conda install mamba -n base -c conda-forge -y
 mamba init && source ~/.bashrc ## only once, if mamba was still not in your local env, try opening a new terminal
 ```
-1). Recommend: Install nanophase including [all nanophase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md) via conda/mamba (`mamba install` is much faster than `conda install`). It should be finished in ~5 mins (depends on your local internet).
+1). Recommend: install nanophase including [all nanophase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md) via conda/mamba (`mamba install` is much faster than `conda install`). It should be finished in ~5 mins (depends on your local internet).
 ```
-mamba create -n nanophase python=3.8 -y
-mamba activate nanophase
-mamba install -c nanophase nanophase -y
+mamba create -n nanophase -c nanophase nanophase -y
 ```
-2). Alternative: Install nanophase via the source code.
+or
+```
+mamba create -n nanophase python=3.8 -y && mamba activate nanophase && mamba install -c nanophase nanophase -y
+```
+2). Alternative: download the nanophase scripts from github; then install and setup [all nanophase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md) in the nanophase env by yourself if you know the system and feel comfortable.
 ```
 git clone https://github.com/Hydro3639/NanoPhase.git
-source NanoPhase/bin/Install.sh
-## this command will create nanophase env and install all necessary packages
+## you can refer to NanoPhase/bin/Install.sh to install all dependancies; e.g., source NanoPhase/bin/Install.sh
 ```
 ## [GTDB](https://gtdb.ecogenomic.org/downloads) and [PLSDB](https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/) download
 Please note that GTDB/PLSDB database will not download automatically via the above installation, so the user can specify a friendly storage location because they take a lot of storage space: GTDB ([~66G](https://ecogenomics.github.io/GTDBTk/installing/index.html#installing-third-party-software:~:text=GTDB%2DTk%20requires%20~66G%20of%20external%20data%20that%20needs%20to%20be%20downloaded%20and%20unarchived%3A)) and PLSDB (~3.4G). Or if you have downloaded the above databases before, you may skip the first download step, just following the location setting step.
@@ -54,6 +55,7 @@ The following packages have been found
 flye                 /path/to/miniconda3/envs/nanophase/bin/flye
 metabat2             /path/to/miniconda3/envs/nanophase/bin/metabat2
 maxbin2              /path/to/miniconda3/envs/nanophase/bin/run_MaxBin.pl
+SemiBin              /path/to/miniconda3/envs/nanophase/bin/SemiBin
 metawrap             /path/to/miniconda3/envs/nanophase/bin/metawrap
 checkm               /path/to/miniconda3/envs/nanophase/bin/checkm
 racon                /path/to/miniconda3/envs/nanophase/bin/racon
@@ -76,7 +78,7 @@ If all pakcages have been installed sucessfully in the nanophase env, type `nano
 ```
 nanophase -h
 
-nanophase v=0.2.2
+nanophase v=0.2.3
 
 Main modules
         check                   check if all packages have been installed
@@ -105,7 +107,7 @@ Each module is run separately. For example, to check the nanophase `meta` module
 ```
 nanophase meta -h
 
-nanophase v=0.2.0
+nanophase v=0.2.3
 
 arguments:
         --long_read_only        only Nanopore long reads were involved [default: on]
@@ -113,7 +115,8 @@ arguments:
         -l, --long              Nanopore reads: fasta/q file that basecalled by Guppy 5+ or using 20+ chemistry was recommended if only Nanopore reads were included [Mandatory]
         -1                      Illumina short reads: fasta/q paired-end #1 file [Optional]
         -2                      Illumina short reads: fasta/q paired-end #2 file [Optional]
-        -m, --medaka_model      medaka model used for medaka polishing [default: r941_min_hac_g507]
+        -m, --medaka_model      medaka model used for medaka polishing [default: r1041_e82_400bps_sup_g615]
+        -e, --environment	Build-in model of SemiBin [default: wastewater]; detail see: SemiBin single_easy_bin -h
         -t, --threads           number of threads that used for assembly and polishing [default: 16]
         -o, --out               output directory [default: ./nanophase-out]
         -h, --help              print help information and exit

@@ -33,8 +33,9 @@ Please note that GTDB/PLSDB database will not download automatically via the abo
 ```
 ## download database: May skip if you have done before or GTDB and PLSDB have been downloaded in the server
 wget https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_v2_data.tar.gz && tar xvzf gtdbtk_v2_data.tar.gz ## 
-wget wget https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/plsdb.fna.bz2 && bunzip2 plsdb.fna.bz2
+wget https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/plsdb.fna.bz2 && bunzip2 plsdb.fna.bz2
 conda activate nanophase
+
 ## setting location
 echo "export GTDBTK_DATA_PATH=/path/to/release/package/" > $(dirname $(dirname `which nanophase`))/etc/conda/activate.d/np_db.sh ## Change /path/to/release/package/ to the real location where you stored the GTDB
 echo "export PLSDB_PATH=/path/to/plsdb.fna" >> $(dirname $(dirname `which nanophase`))/etc/conda/activate.d/np_db.sh ## Change /path/to/plsdb.fna to the real location where you stored the PLSDB

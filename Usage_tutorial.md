@@ -1,4 +1,4 @@
-## A guide to verify NanoPhase installation: reconstructing reference-quality MAGs from an example dataset
+## A guide to verify NanoPhase installation: reconstructing reference-quality MAGs from an example dataset (nanophase v0.2.2)
 ### [Example dataset](https://github.com/example-data/np-example) download
 ```
 wget https://github.com/example-data/np-example/raw/main/np.test.tar && tar -xvf np.test.tar && rm -rf np.test.tar ## download the example data
@@ -168,7 +168,7 @@ bin.2   99.00   0.55    100.00  1889441 2       1827513 0.52311 N       d__Bacte
 ```
 ### Antobiotic Resistance Genes (ARGs) identification from the above reconstructed MAGs
 `nanophase args` module still is in the active development stage at this time being. We hope to provide more versatile functions in the next release.
-Please note that [SARG database](https://github.com/xinehc/args_oap/tree/main/args_oap/DB) is under revision, the output results were generated using `nanophase v=0.2.0`
+We use [SARG database](https://github.com/xinehc/args_oap/tree/main/src/args_oap/db) for the ARGs annotation, the output results were generated using `nanophase v=0.2.0`
 ```
 conda activate nanophase ## if not in the nanophase env
 nanophase args -i ont-nanophase-out/03-Polishing/Final-bins/ -x fasta -o nanophase.ARGs.summary.txt

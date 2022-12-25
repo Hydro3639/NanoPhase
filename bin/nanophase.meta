@@ -350,7 +350,7 @@ semibin_binning(){
 	samtools index -@ $N_threads $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.mapped.sorted.bam >>$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
 	
 	## binning ## should check tranining type
-	SemiBin single_easy_bin --environment $semibin_model -i $OutDIR/01-LongAssemblies/assembly.fasta -b $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.mapped.sorted.bam -p $N_threads --semi-supervised --sequencing-type=long_read -o $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-output >>$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
+	SemiBin single_easy_bin --environment $semibin_model -i $OutDIR/01-LongAssemblies/assembly.fasta -b $OutDIR/02-LongBins/INITIAL_BINNING/semibin/contig.mapped.sorted.bam -p $N_threads --self-supervised --sequencing-type=long_read -o $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin-output >>$OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>&1
 
 	## check if finished
 	str_semibin=`grep "Finished binning" $OutDIR/02-LongBins/INITIAL_BINNING/semibin/semibin.log 2>/dev/null | wc -l`

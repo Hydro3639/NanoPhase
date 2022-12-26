@@ -187,10 +187,10 @@ fi
 
 if [[ ! -s $OutDIR/.package.not.installed ]]; then
 	echo "All required packages have been found in the environment. If the above certain packages integrated into nanophase were used in your investigation, please give them credit as well :)"
-	path_check=`cat  $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | awk '!a[$1]++' | wc -l`
+	path_check=`cat $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | awk '!a[$1]++' | wc -l`
 	if [[ $path_check -gt 1 ]]; then
 		env_name=`which nanophase | awk -F"/" '{print $(NF-2)}'`
-		not_in=`cat .package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | grep -v "$env_name" | while read line; do grep -w $line .package.installed; done | awk '!a[$1]++ {print $1}' | tr '\n' ' ' | sed -e 's/ $//g'`
+		not_in=`cat $OutDIR/.package.installed | awk '{printf "%-20s %s\n", $1,$2}' | awk '{print $2}' | while read path; do dirname $path; done | grep -v "$env_name" | while read line; do grep -w $line .package.installed; done | awk '!a[$1]++ {print $1}' | tr '\n' ' ' | sed -e 's/ $//g'`
 		echo -e "Warning: [$not_in] has not been installed in the [${env_name}] env. Strongly recommend intalling all packages in the [${env_name}] env, or it may result in a failure\n"
 		rm -rf  $OutDIR/.package.installed
 	else

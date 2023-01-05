@@ -1,4 +1,5 @@
 ## A guide to verify NanoPhase installation: reconstructing reference-quality MAGs from an example dataset (nanophase v0.2.2)
+#### Note: since nanophase v0.2.3 ([semibin](https://github.com/BigDataBiology/SemiBin) as a new binner, which really improved genome reconstruction results a lot), it may encounter error issues when performing binning process with only a few contigs. It should also be an issue when handling very simple long-read datasets, so in this way, I would suggest to use nanophase v0.2.2: `mamba create -n nanophase-v0.2.2 -c nanophase nanophase=0.2.2 -y`. Sorry for that, we will try to fix this issue in the next release.
 ### [Example dataset](https://github.com/example-data/np-example) download
 ```
 wget https://github.com/example-data/np-example/raw/main/np.test.tar && tar -xvf np.test.tar && rm -rf np.test.tar ## download the example data

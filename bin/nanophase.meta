@@ -222,7 +222,7 @@ long_read_assembly(){
 		exit 1; >&2
 	fi
 
-	mv $OutDIR/01-LongAssemblies/tmp/assembly.fasta $OutDIR/01-LongAssemblies/tmp/assembly_info.txt $OutDIR/01-LongAssemblies/tmp/flye.log $OutDIR/01-LongAssemblies
+	mv $OutDIR/01-LongAssemblies/tmp/assembly.fasta $OutDIR/01-LongAssemblies/tmp/assembly_graph.gfa $OutDIR/01-LongAssemblies/tmp/assembly_info.txt $OutDIR/01-LongAssemblies/tmp/flye.log $OutDIR/01-LongAssemblies
 	
 	if [ -f $OutDIR/01-LongAssemblies/assembly.fasta -a -f $OutDIR/01-LongAssemblies/assembly_info.txt ]; then
 		echo "`datetime.DONE` long-read assembly finished sucessfully: detailed log file is $OutDIR/01-LongAssemblies/flye.log"

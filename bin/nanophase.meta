@@ -685,6 +685,8 @@ genome_stats(){
 #	fi; done | paste $OutDIR/03-Polishing/tmp.nanophase.genome.summary - | awk -F"\t" -v OFS="\t" '{temp = $9; $9 = $10; $10 = temp; print $0}' | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tIfCir.\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.ont.genome.summary
 	
 	# clean up and rename
+	mv $OutDIR/03-Polishing/Final-bins/checkm-output $OutDIR/03-Polishing/checkm-result
+	mv $OutDIR/03-Polishing/Final-bins/tmp $OutDIR/03-Polishing/gtdbtk-result
 	rm -rf $OutDIR/03-Polishing/Final-bins/tmp* && rm -rf $OutDIR/03-Polishing/Final-bins/checkm* && rm -rf $OutDIR/03-Polishing/tmp.nanophase.genome.summary 
 	#rename 's/medaka\.fasta/fasta/' $OutDIR/03-Polishing/Final-bins/*fasta ## linux-rename not equal perl-rename
 	ls $OutDIR/03-Polishing/Final-bins/*medaka.fasta | sed -e "s/.medaka.fasta//g" | while read line; do mv ${line}.medaka.fasta ${line}.fasta; done
@@ -1034,6 +1036,8 @@ genome_stats(){
 #	fi; done | paste $OutDIR/03-Polishing/tmp.nanophase.genome.summary - | awk -F"\t" -v OFS="\t" '{temp = $9; $9 = $10; $10 = temp; print $0}' | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tIfCir.\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.hybrid.genome.summary
 	
 	# clean up and rename
+	mv $OutDIR/03-Polishing/Final-bins/checkm-output $OutDIR/03-Polishing/checkm-result
+	mv $OutDIR/03-Polishing/Final-bins/tmp $OutDIR/03-Polishing/gtdbtk-result
 	rm -rf $OutDIR/03-Polishing/Final-bins/tmp* && rm -rf $OutDIR/03-Polishing/Final-bins/checkm* && rm -rf $OutDIR/03-Polishing/tmp.nanophase.genome.summary 
 	# rename files and contig names
 	#rename 's/\.polca//' $OutDIR/03-Polishing/Final-bins/*fasta

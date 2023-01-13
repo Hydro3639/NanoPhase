@@ -620,7 +620,7 @@ genome_stats(){
 		echo "`datetime.INFO` genome quality assessment has been finished. Now, go to the next stage: genome classification"
 	else
 		echo "`datetime.TASK` genome quality assessment starts"
-		checkm lineage_wf -x fasta -t $N_threads $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins $OutDIR/03-Polishing/Final-bins/checkm-output >$OutDIR/03-Polishing/Final-bins/checkm.log 2>/dev/null
+		checkm lineage_wf -x fasta -t $N_threads -f $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins $OutDIR/03-Polishing/Final-bins/checkm-output >$OutDIR/03-Polishing/Final-bins/checkm.log 2>/dev/null
 		echo "`cat $OutDIR/03-Polishing/Final-bins/checkm.log`"
 		
 		##
@@ -971,7 +971,7 @@ genome_stats(){
 		echo "`datetime.INFO` genome quality assessment has been finished. Now, go to the next stage: genome classification"
 	else
 		echo "`datetime.TASK` genome quality assessment starts"
-		checkm lineage_wf -x fasta -t $N_threads $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/ $OutDIR/03-Polishing/Final-bins/checkm-output >$OutDIR/03-Polishing/Final-bins/checkm.log 2>/dev/null
+		checkm lineage_wf -x fasta -t $N_threads -f $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/ $OutDIR/03-Polishing/Final-bins/checkm-output >$OutDIR/03-Polishing/Final-bins/checkm.log 2>/dev/null
 		echo "`cat $OutDIR/03-Polishing/Final-bins/checkm.log`"
 		
 		##

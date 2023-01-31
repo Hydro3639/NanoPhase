@@ -624,8 +624,8 @@ genome_stats(){
 		echo "`cat $OutDIR/03-Polishing/Final-bins/checkm.log`"
 		
 		##
-		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '! /^-------------------/' >$OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness
-		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10' > $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness
+		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '! /^-------------------/' >$OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness
+		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10' > $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness
 
 		if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]] && [[ `wc -l $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness | awk '{print $1}'` == `cat $OutDIR/03-Polishing/binIDs | wc -l` ]]; then
 			echo "`datetime.DONE` genome quality assessment finished sucessfully. Now, go to the next stage: genome classification"
@@ -636,7 +636,7 @@ genome_stats(){
 	fi
 
 	## check BBMap
-	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do stats.sh $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins/${line}.fasta format=6 | grep -v "#" | awk '{print $3"\t"$1"\t"$9"\t"$18}'; done > $OutDIR/03-Polishing/Final-bins/tmp.genome-stats
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do stats.sh $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins/${line}.fasta format=6 | grep -v "#" | awk '{print $3"\t"$1"\t"$9"\t"$18}'; done > $OutDIR/03-Polishing/Final-bins/tmp.genome-stats
 
         if [[ ! -s $OutDIR/03-Polishing/Final-bins/tmp.genome-stats ]]; then
 		echo "`datetime.ERROR` Something wrong with BBMap::stats.sh, terminating..."
@@ -644,7 +644,7 @@ genome_stats(){
         fi
 	
 	## filtering genome quality based on completeness (>=50%) and contamination (<=10%): should add command option in the next version update.
-	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do mv $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins/${line}.fasta $OutDIR/03-Polishing/Final-bins/ ; done
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do mv $OutDIR/03-Polishing/Final-bins/tmp-medaka-bins/${line}.fasta $OutDIR/03-Polishing/Final-bins/ ; done
 
 	## Taxa info
 	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]] && [[ `cat $OutDIR/03-Polishing/Final-bins/tmp.taxa | wc -l` == `ls $OutDIR/03-Polishing/Final-bins/*fasta | wc -l` ]]; then
@@ -666,7 +666,7 @@ genome_stats(){
 	fi
 	
 	## data combination
-	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
 
 	paste $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness $OutDIR/03-Polishing/Final-bins/tmp.genome-stats $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted | sort -t. -k2n | sed -e 's/.medaka//g' > $OutDIR/03-Polishing/tmp.nanophase.genome.summary
 	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.ont.genome.summary
@@ -975,8 +975,8 @@ genome_stats(){
 		echo "`cat $OutDIR/03-Polishing/Final-bins/checkm.log`"
 		
 		##
-		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '! /^-------------------/' > $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness
-		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10' > $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness
+		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '! /^-------------------/' > $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness
+		sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10' > $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness
 
 		if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]] && [[ `wc -l $OutDIR/03-Polishing/Final-bins/tmp.all.genome.completeness | awk '{print $1}'` == `cat $OutDIR/03-Polishing/binIDs | wc -l` ]]; then
 			echo "`datetime.DONE` genome quality assessment finished sucessfully. Now, go to the next stage: genome classification"
@@ -987,7 +987,7 @@ genome_stats(){
 	fi
 
 	## check BBMap
-	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do stats.sh $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.fasta format=6 | grep -v "#" | awk '{print $3"\t"$1"\t"$9"\t"$18}'; done > $OutDIR/03-Polishing/Final-bins/tmp.genome-stats
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do stats.sh $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.fasta format=6 | grep -v "#" | awk '{print $3"\t"$1"\t"$9"\t"$18}'; done > $OutDIR/03-Polishing/Final-bins/tmp.genome-stats
 
 	if [[ ! -s $OutDIR/03-Polishing/Final-bins/tmp.genome-stats ]]; then
 		echo "`datetime.ERROR` Something wrong with BBMap::stats.sh, terminating..."
@@ -995,7 +995,7 @@ genome_stats(){
 	fi
 
 	## filtering genome quality based on completeness (>=50%) and contamination (<=10%): should add command option in the next version update.
-	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do mv $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.fasta $OutDIR/03-Polishing/Final-bins/ ; done
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do mv $OutDIR/03-Polishing/Final-bins/tmp-polca-bins/${line}.fasta $OutDIR/03-Polishing/Final-bins/ ; done
 
 	## Taxa info
 	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]] && [[ `cat $OutDIR/03-Polishing/Final-bins/tmp.taxa | wc -l` == `ls $OutDIR/03-Polishing/Final-bins/*fasta | wc -l` ]]; then
@@ -1017,7 +1017,7 @@ genome_stats(){
 	fi
 
 	## data combination
-	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
 
 	paste $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness $OutDIR/03-Polishing/Final-bins/tmp.genome-stats $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted | sort -t. -k2n | sed -e 's/.polca//g' > $OutDIR/03-Polishing/tmp.nanophase.genome.summary
 	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.hybrid.genome.summary

@@ -38,7 +38,7 @@ ONT_seqs=""
 CRTDIR=$(cd `dirname $0`; pwd)
 OutDIR="nanophase-out"
 #check_pkg="false"
-medaka_model="r941_min_hac_g507"
+medaka_model="r941_min_sup_g507"
 base_dir=$(cd `dirname $0`; pwd)
 np_version(){ echo -e `$base_dir/nanophase -v`; }
 

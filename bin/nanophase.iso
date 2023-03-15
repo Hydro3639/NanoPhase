@@ -14,7 +14,7 @@ arguments:
 	--l, --long		Nanopore reads with accuracy of >95% were recommended if only Nanopore reads were included [Mandatory]
 	-1			Illumina short reads: fasta/q paired-end #1 file [Optional]
 	-2			Illumina short reads: fasta/q paired-end #2 file [Optional]
-	-m, --medaka_model      medaka model used for medaka polishing [default: r941_min_hac_g507]
+	-m, --medaka_model      medaka model used for medaka polishing [default: r941_min_sup_g507]
 	-t, --threads           number of threads that used for assembly and polishing [default: 16]
 	-o, --out               output directory [default: ./nanophase-out]
 	-h, --help              print help information and exit

@@ -23,11 +23,7 @@ or
 ```
 mamba create -n nanophase python=3.8 -y && mamba activate nanophase && mamba install -c nanophase nanophase -y
 ```
-2). Alternative: download the nanophase scripts from github; then install and setup [all nanophase dependancies](https://github.com/Hydro3639/NanoPhase/blob/main/dependancy.md) in the nanophase env by yourself if you know the system and feel comfortable.
-```
-git clone https://github.com/Hydro3639/NanoPhase.git
-## you can refer to NanoPhase/bin/Install.sh to install all dependancies; e.g., source NanoPhase/bin/Install.sh
-```
+
 ## [GTDB](https://gtdb.ecogenomic.org/downloads) and [PLSDB](https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/) download
 Please note that GTDB/PLSDB database will not download automatically via the above installation, so the user can specify a friendly storage location because they take a lot of storage space: GTDB ([~66G](https://ecogenomics.github.io/GTDBTk/installing/index.html#installing-third-party-software:~:text=GTDB%2DTk%20requires%20~66G%20of%20external%20data%20that%20needs%20to%20be%20downloaded%20and%20unarchived%3A)) and PLSDB (~3.4G). Or if you have downloaded the above databases before, you may skip the first download step, just following the location setting step.
 ```

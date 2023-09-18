@@ -666,7 +666,7 @@ genome_stats(){
 	fi
 	
 	## data combination
-	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk -F"\t" '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
 
 	paste $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness $OutDIR/03-Polishing/Final-bins/tmp.genome-stats $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted | sort -t. -k2n | sed -e 's/.medaka//g' > $OutDIR/03-Polishing/tmp.nanophase.genome.summary
 	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.ont.genome.summary
@@ -1017,7 +1017,7 @@ genome_stats(){
 	fi
 
 	## data combination
-	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
+	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm-output/checkm_results.tsv | tail -n+4 | head -n -1 | awk '{print $1"\t"$13"\t"$14"\t"$15}' | awk '$2>=50 && $3<=10 {print $1}' | while read line; do grep -w $line $OutDIR/03-Polishing/Final-bins/tmp.taxa | awk -F"\t" '{print $2}' ; done > $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted
 
 	paste $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness $OutDIR/03-Polishing/Final-bins/tmp.genome-stats $OutDIR/03-Polishing/Final-bins/tmp.taxa.sorted | sort -t. -k2n | sed -e 's/.polca//g' > $OutDIR/03-Polishing/tmp.nanophase.genome.summary
 	cat $OutDIR/03-Polishing/tmp.nanophase.genome.summary | sed -e '1i#BinID\tCompleteness\tContamination\tStrain heterogeneity\tGenomeSize(bp)\tN_Contig\tN50(bp)\tGC\tGTDB-Taxa' > $OutDIR/03-Polishing/nanophase.hybrid.genome.summary

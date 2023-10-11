@@ -25,10 +25,10 @@ mamba create -n nanophase python=3.8 -y && mamba activate nanophase && mamba ins
 ```
 
 ## [GTDB](https://gtdb.ecogenomic.org/downloads) and [PLSDB](https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/) download
-Please note that GTDB/PLSDB database will not download automatically via the above installation, so the user can specify a friendly storage location because they take a lot of storage space: GTDB ([~66G](https://ecogenomics.github.io/GTDBTk/installing/index.html#installing-third-party-software:~:text=GTDB%2DTk%20requires%20~66G%20of%20external%20data%20that%20needs%20to%20be%20downloaded%20and%20unarchived%3A)) and PLSDB (~3.4G). Or if you have downloaded the above databases before, you may skip the first download step, just following the location setting step.
+Please note that GTDB/PLSDB database will not download automatically via the above installation, so the user can specify a friendly storage location because they take a lot of storage space: GTDB ([~84G](https://ecogenomics.github.io/GTDBTk/installing/index.html#installing-third-party-software:~:text=GTDB%2DTk%20requires%20~84G%20of%20external%20data%20that%20needs%20to%20be%20downloaded%20and%20unarchived) and PLSDB (~3.4G). Or if you have downloaded the above databases before, you may skip the first download step, just following the location setting step.
 ```
 ## download database: May skip if you have done before or GTDB and PLSDB have been downloaded in the server
-wget https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_v2_data.tar.gz && tar xvzf gtdbtk_v2_data.tar.gz 
+wget https://data.gtdb.ecogenomic.org/releases/latest/auxillary_files/gtdbtk_data.tar.gz && tar xvzf gtdbtk_data.tar.gz
 wget https://ccb-microbe.cs.uni-saarland.de/plsdb/plasmids/download/plsdb.fna.bz2 && bunzip2 plsdb.fna.bz2
 conda activate nanophase
 

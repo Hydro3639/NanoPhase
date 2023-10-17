@@ -202,7 +202,7 @@ long_read_assembly(){
 	mv $OutDIR/01-LongAssemblies/tmp/assembly.fasta $OutDIR/01-LongAssemblies/tmp/assembly_info.txt $OutDIR/01-LongAssemblies/tmp/flye.log $OutDIR/01-LongAssemblies
 
         if [ -f $OutDIR/01-LongAssemblies/assembly.fasta -a -f $OutDIR/01-LongAssemblies/assembly_info.txt ]; then
-                echo "`datetime.DONE` long-read assembly finished sucessfully: detailed log file is $OutDIR/01-LongAssemblies/flye.log"
+                echo "`datetime.DONE` long-read assembly finished successfully: detailed log file is $OutDIR/01-LongAssemblies/flye.log"
         	rm -rf $OutDIR/01-LongAssemblies/tmp
 	else
                 echo "`datetime.ERROR` Something wrong with long-read assembly, terminating..."
@@ -212,7 +212,7 @@ long_read_assembly(){
 
 if [ -f $OutDIR/01-LongAssemblies/assembly.fasta -a -f $OutDIR/01-LongAssemblies/assembly_info.txt ]; then
         echo "`datetime.INFO` long-read assembly has been found in the folder: $OutDIR/01-LongAssemblies/. Now go to the next stage: generating LongBins...
-        Note: plese ensure flye assembly finished sucessfully in the previous run, if not, please remove this folder using the command 'rm -rf $OutDIR/$OutDIR/01-LongAssemblies/' and re-run nanophase command"
+        Note: please ensure flye assembly finished successfully in the previous run, if not, please remove this folder using the command 'rm -rf $OutDIR/$OutDIR/01-LongAssemblies/' and re-run nanophase command"
 else
         if [[ -d $OutDIR/01-LongAssemblies ]]; then
                 echo "`datetime.INFO` Long-read assembly re-starts"
@@ -234,7 +234,7 @@ racon_polishing(){
 minimap2 -x map-ont -d $OutDIR/02-LongBins/bin.fasta.mni $OutDIR/02-LongBins/bin.raw.fasta >$OutDIR/03-Polishing/Racon/racon.polish.log 2>&1 && minimap2 -ax map-ont -t $N_threads $OutDIR/02-LongBins/bin.fasta.mni $ONT_seqs > $OutDIR/03-Polishing/Racon/overlaps.racon.sam 2>>$OutDIR/03-Polishing/Racon/racon.polish.log && racon -t $N_threads $ONT_seqs $OutDIR/03-Polishing/Racon/overlaps.racon.sam $OutDIR/02-LongBins/bin.raw.fasta > $OutDIR/03-Polishing/Racon/bin-racon.fasta 2>>$OutDIR/03-Polishing/Racon/racon.polish.log
 
 if [[ -s $OutDIR/03-Polishing/Racon/bin-racon.fasta ]]; then
-	echo "`datetime.DONE` racon polishing finished sucessfully: detailed log file is $OutDIR/03-Polishing/Racon/racon.polish.log"
+	echo "`datetime.DONE` racon polishing finished successfully: detailed log file is $OutDIR/03-Polishing/Racon/racon.polish.log"
 	rm -rf $OutDIR/02-LongBins/bin.fasta.mni && rm -rf $OutDIR/03-Polishing/Racon/overlaps.racon.sam
 else
 	echo "`datetime.ERROR` Something wrong with racon polishing, terminating..."
@@ -262,7 +262,7 @@ medaka_consensus -m $medaka_model -i $ONT_seqs -d $OutDIR/03-Polishing/Racon/bin
 mv $OutDIR/03-Polishing/medaka/tmp/consensus.fasta $OutDIR/03-Polishing/medaka/bin-medaka.fasta
 
 if [[ -s $OutDIR/03-Polishing/medaka/bin-medaka.fasta ]]; then
-	echo "`datetime.DONE` medaka polishing finished sucessfully: detailed log file is $OutDIR/03-Polishing/medaka/medaka.polish.log"
+	echo "`datetime.DONE` medaka polishing finished successfully: detailed log file is $OutDIR/03-Polishing/medaka/medaka.polish.log"
 	rm -rf $OutDIR/03-Polishing/medaka/tmp/ && rm -rf $OutDIR/03-Polishing/Racon/bin-racon.fasta.*
 else
 	echo "`datetime.ERROR` Something wrong with medaka polishing, terminating..."
@@ -274,7 +274,7 @@ if [[ -s $OutDIR/03-Polishing/medaka/bin-medaka.fasta ]]; then
 	if [[ $Type == hybrid ]]; then
 		echo "`datetime.INFO` medaka polishing has been finished. Now go to the next stage: polypolish polishing"
 	else
-		echo "`datetime.INFO` medaka polishing has been finished. Now go to the next stage: bin quality assessement and genome classification"
+		echo "`datetime.INFO` medaka polishing has been finished. Now go to the next stage: bin quality assessment and genome classification"
 	fi
 else
 	if [[ -d $OutDIR/03-Polishing/medaka ]]; then
@@ -301,7 +301,7 @@ genome_stats(){
 
 	sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | grep -v '\----------------------------' | awk '{print $1"\t"$13"\t"$14"\t"$15}' > $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness
 	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]]; then
-		echo "`datetime.DONE` genome quality assessment finished sucessfully"
+		echo "`datetime.DONE` genome quality assessment finished successfully"
 	else
 		echo "`datetime.ERROR` Something wrong with checkm process, terminating..."
 		exit 1; >&2
@@ -309,13 +309,13 @@ genome_stats(){
 	
 	## Taxa info
 	echo "`datetime.TASK` Genome taxa classification starts"
-	gtdbtk classify_wf --genome_dir $OutDIR/03-Polishing/Final-bins/ -x fasta --out_dir $OutDIR/03-Polishing/Final-bins/tmp --cpus $N_threads >/dev/null 2>&1
+	gtdbtk classify_wf --genome_dir $OutDIR/03-Polishing/Final-bins/ -x fasta --out_dir $OutDIR/03-Polishing/Final-bins/tmp --cpus $N_threads --skip_ani_screen >/dev/null 2>&1
 	echo "`cat $OutDIR/03-Polishing/Final-bins/tmp/gtdbtk.log`"
 	echo "`datetime.DONE` genome classification done"
 	
 	cat $OutDIR/03-Polishing/Final-bins/tmp/classify/gtdbtk.*summary.tsv | grep -v '^user_genome' | awk -F"\t" '{print $2}' > $OutDIR/03-Polishing/Final-bins/tmp.taxa
 	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]]; then
-		echo "`datetime.DONE` GTDB::Taxa finished sucessfully"
+		echo "`datetime.DONE` GTDB::Taxa finished successfully"
 	else
 		echo "`datetime.ERROR` Something wrong with GTDB:Taxa process, terminating..."
 		exit 1; >&2 
@@ -369,9 +369,9 @@ sr_polypolish_polca_polishing(){
 polypolish_polishing(){
 bwa index $OutDIR/03-Polishing/medaka/bin-medaka.fasta >$OutDIR/03-Polishing/Polypolish/polypolish.polish.log 2>&1 && bwa mem -t $N_threads -a $OutDIR/03-Polishing/medaka/bin-medaka.fasta $SR1_seqs > $OutDIR/03-Polishing/Polypolish/bin_alignments_1.sam 2>>$OutDIR/03-Polishing/Polypolish/polypolish.polish.log && bwa mem -t $N_threads -a $OutDIR/03-Polishing/medaka/bin-medaka.fasta $SR2_seqs > $OutDIR/03-Polishing/Polypolish/bin_alignments_2.sam 2>>$OutDIR/03-Polishing/Polypolish/polypolish.polish.log && polypolish_insert_filter.py --in1 $OutDIR/03-Polishing/Polypolish/bin_alignments_1.sam --in2 $OutDIR/03-Polishing/Polypolish/bin_alignments_2.sam --out1 $OutDIR/03-Polishing/Polypolish/bin_filtered_1.sam --out2 $OutDIR/03-Polishing/Polypolish/bin_filtered_2.sam 2>>$OutDIR/03-Polishing/Polypolish/polypolish.polish.log && polypolish $OutDIR/03-Polishing/medaka/bin-medaka.fasta $OutDIR/03-Polishing/Polypolish/bin_filtered_1.sam $OutDIR/03-Polishing/Polypolish/bin_filtered_2.sam > $OutDIR/03-Polishing/Polypolish/bin-polypolish.fasta 2>>$OutDIR/03-Polishing/Polypolish/polypolish.polish.log && rm -rf $OutDIR/03-Polishing/Polypolish/*sam && rm -rf $OutDIR/03-Polishing/medaka/bin-medaka.fasta.*
 
-## Check if the polypolish finished sucessfully
+## Check if the polypolish finished successfully
 if [[ -s $OutDIR/03-Polishing/Polypolish/bin-polypolish.fasta ]]; then
-	echo "`datetime.INFO` polypolish polishing finished sucessfully: detailed log file is $OutDIR/03-Polishing/Polypolish/polypolish.polish.log"
+	echo "`datetime.INFO` polypolish polishing finished successfully: detailed log file is $OutDIR/03-Polishing/Polypolish/polypolish.polish.log"
 else
 	echo "`datetime.ERROR` Something wrong with polypolish polishing, terminating..."
 	exit 1; >&2
@@ -399,7 +399,7 @@ if [[ $sr_suffix == fa ]] || [[ $sr_suffix == fa.gz ]]; then
 	## clean: add ow=t allow overwritting and fake q
 	reformat.sh ow=t in=$SR1_seqs in2=$SR2_seqs out=$OutDIR/03-Polishing/POLCA/tmp/sr_1.fq out2=$OutDIR/03-Polishing/POLCA/tmp/sr_2.fq qfake=30 >$OutDIR/03-Polishing/POLCA/polca.polish.log 2>&1
 	if [[ -s $OutDIR/03-Polishing/POLCA/tmp/sr_1.fq ]] && [[ -s $OutDIR/03-Polishing/POLCA/tmp/sr_2.fq ]]; then
-		echo "`datetime.DONE` fa2fq process finished sucessfully"
+		echo "`datetime.DONE` fa2fq process finished successfully"
 	else
 		echo "`datetime.ERROR` Something wrong with fa2fq process, terminating..."
 		exit 1; >&2
@@ -423,7 +423,7 @@ if [[ ! -s $Polish_Path/POLCA/tmp/bin-polypolish.fasta.PolcaCorrected.fa ]]; the
 	echo "`datetime.INFO` Seems POLCA polishing did not improve the genome quality, so using polypolish-polished bins instead"
 	cp $Polish_Path/Polypolish/bin-polypolish.fasta $Polish_Path/POLCA/bin-polca.fasta
 else
-	echo "`datetime.DONE` POLCA-polishing has been finished sucessfully: detailed log file is $Polish_Path/POLCA/polca.polish.log"
+	echo "`datetime.DONE` POLCA-polishing has been finished successfully: detailed log file is $Polish_Path/POLCA/polca.polish.log"
 	mv $Polish_Path/POLCA/tmp/bin-polypolish.fasta.PolcaCorrected.fa $Polish_Path/POLCA/bin-polca.fasta
 fi
 
@@ -432,7 +432,7 @@ rm -rf $Polish_Path/POLCA/tmp && rm -rf $Polish_Path/Polypolish/bin-polypolish.f
 }
 
 if [[ -s $OutDIR/03-Polishing/POLCA/bin-polca.fasta ]]; then
-	echo "`datetime.INFO` polca polishing has been finished. Now go to the next stage: bin quality assessement and genome classification"
+	echo "`datetime.INFO` polca polishing has been finished. Now go to the next stage: bin quality assessment and genome classification"
 else
 	if [[ -d $OutDIR/03-Polishing/POLCA ]]; then
 		echo "`datetime.INFO` polca polishing re-starts"
@@ -458,7 +458,7 @@ genome_stats(){
 
         sed -n '/------------/,$p' $OutDIR/03-Polishing/Final-bins/checkm.log | tail -n+4 | head -n -1 | grep -v '\----------------------------' | awk '{print $1"\t"$13"\t"$14"\t"$15}' > $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness
         if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.genome.completeness ]]; then
-		echo "`datetime.DONE` genome quality assessment finished sucessfully"
+		echo "`datetime.DONE` genome quality assessment finished successfully"
 	else
 		echo "`datetime.ERROR` Something wrong with checkm process, terminating..."
 		exit 1; >&2
@@ -466,13 +466,13 @@ genome_stats(){
 	
 	## Taxa info
 	echo "`datetime.TASK` Genome taxa classification starts"
-	gtdbtk classify_wf --genome_dir $OutDIR/03-Polishing/Final-bins/ -x fasta --out_dir $OutDIR/03-Polishing/Final-bins/tmp --cpus $N_threads >/dev/null 2>&1
+	gtdbtk classify_wf --genome_dir $OutDIR/03-Polishing/Final-bins/ -x fasta --out_dir $OutDIR/03-Polishing/Final-bins/tmp --cpus $N_threads --skip_ani_screen >/dev/null 2>&1
 	echo "`cat $OutDIR/03-Polishing/Final-bins/tmp/gtdbtk.log`"
 	echo "`datetime.DONE` genome classification done"
        	
 	cat $OutDIR/03-Polishing/Final-bins/tmp/classify/gtdbtk.*summary.tsv | grep -v '^user_genome' | awk -F"\t" '{print $2}' > $OutDIR/03-Polishing/Final-bins/tmp.taxa
 	if [[ -s $OutDIR/03-Polishing/Final-bins/tmp.taxa ]]; then
-		echo "`datetime.DONE` GTDB:Taxa was finished sucessfully"
+		echo "`datetime.DONE` GTDB:Taxa was finished successfully"
 	else
 		echo "`datetime.ERROR` Something wrong with GTDB:Taxa process, terminating..."
 		exit 1; >&2
@@ -522,7 +522,7 @@ fi
 if [[ $Type = long_read_only ]]; then
         echo "`datetime.INFO` long_read_only model was selected, only Nanopore long reads will be used"
 	if [[ -f $SR1_seqs ]] || [[ -f $SR2_seqs ]]; then
-                echo "`datetime.ERROR` It seems you are using long_read_only model, but provided short reads at the same time. If short reads were involved, please use [--hybrid] parameter, or remove short reads in the command; terminating..."
+                echo "`datetime.ERROR` It seems you are using the long_read_only model, but provided short reads at the same time. If short reads were involved, please use [--hybrid] parameter, or remove short reads in the command; terminating..."
                 show_help; exit 1; fi
         long_read_check
         ## long-read-only model
